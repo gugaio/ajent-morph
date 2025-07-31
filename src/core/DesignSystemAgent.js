@@ -86,6 +86,16 @@ class DesignSystemAgent {
     try {
       // Show typing indicator
       this.chatInterface.showTyping();
+
+      if (typeof message === 'string' && message.trim().toLowerCase() === 'undo') {
+        const undoResult = await this.undoLastChange();
+        this.chatInterface.hideTyping();
+        this.chatInterface.addMessage({
+          type: 'agent',
+          content: undoResult.message
+        });
+        return;
+      }
       
       // Process the command
       const result = await this.commandProcessor.process(message, {
@@ -116,6 +126,25 @@ class DesignSystemAgent {
         content: 'Desculpe, não consegui processar esse comando. Pode tentar de outra forma?'
       });
       console.error('Command processing error:', error);
+    }
+  }
+
+  async undoLastChange() {
+    try {
+      const undoResult = await this.commandProcessor.undo();
+      if (undoResult && undoResult.changes) {
+        this.applyChanges(undoResult.changes);
+      }
+      return {
+        message: undoResult && undoResult.message ? undoResult.message : 'Alteração desfeita.',
+        success: undoResult && undoResult.success !== undefined ? undoResult.success : true
+      };
+    } catch (error) {
+      console.error('Undo error:', error);
+      return {
+        message: 'Não foi possível desfazer a última alteração.',
+        success: false
+      };
     }
   }
   

@@ -224,6 +224,7 @@ class ResponseApplier {
                                window.getComputedStyle(element)[normalizedProp];
           
         // Aplica o novo valor
+        debugger
         element.style[normalizedProp] = normalizedValue;
           
         // Verifica se foi aplicado com sucesso

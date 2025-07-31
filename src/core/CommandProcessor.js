@@ -88,7 +88,6 @@ class CommandProcessor {
 
     try {
       // Use the AI agent squad to process the request
-      debugger
       const response = await this.squad.send(prompt);
       
       // The DOMManipulationAgent should return a structured response
