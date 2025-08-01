@@ -23,15 +23,22 @@ class CommandProcessor {
   }
   
   async process(message, context = {}) {
-    const { selectedElement } = context;
+    const { selectedElement, mode, elementsData } = context;
     
-    if (!selectedElement) {
+    // Only check for selectedElement if we're not in component generation mode
+    if (!selectedElement && mode !== 'component_generation') {
       return {
         message: 'Por favor, clique em um elemento da página primeiro para que eu possa editá-lo! 👆'
       };
     }
     
     try {
+      if (mode === 'component_generation') {
+        // Handle component generation mode
+        return await this.processComponentGeneration(message, elementsData);
+      }
+      
+      // Original CSS modification logic
       // Gera contexto para LLM
       const contextPrompt = this.inspector.generateContextPrompt(selectedElement, message);
       
@@ -69,6 +76,58 @@ class CommandProcessor {
         success: false
       };
     }
+  }
+
+  async processComponentGeneration(message, elementsData) {
+    try {
+      // Build component generation prompt
+      const componentPrompt = this.buildComponentGenerationPrompt(message, elementsData);
+      
+      // Call LLM for component generation
+      let llmResponse;
+      try {
+        llmResponse = await this.callLLM(componentPrompt);
+      } catch (error) {
+        console.warn('LLM call failed for component generation:', error.message);
+        // Return a fallback response
+        return {
+          message: 'Erro ao conectar com IA. Tente novamente em alguns instantes.',
+          success: false
+        };
+      }
+      
+      // For component generation, we expect HTML in the response
+      console.log('Raw LLM response:', llmResponse);
+      
+      return {
+        message: 'Componente gerado com sucesso!',
+        success: true,
+        html: llmResponse
+      };
+      
+    } catch (error) {
+      console.error('Error in component generation:', error);
+      return {
+        message: 'Erro ao gerar componente.',
+        success: false
+      };
+    }
+  }
+
+  buildComponentGenerationPrompt(description, elementsData) {
+    const elementsDescription = elementsData.map((data, index) => {
+      return `Elemento ${index + 1}:
+HTML: ${data.html}
+CSS principais: ${JSON.stringify(data.computedCSS, null, 2)}
+Posição: ${data.position.width}x${data.position.height}`;
+    }).join('\n\n');
+
+    return `Baseado neste(s) elemento(s):
+${elementsDescription}
+
+Crie: ${description}
+
+Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou classes. O componente deve ser funcional e bem estruturado.`;
   }
   
   // Método para desfazer última mudança
