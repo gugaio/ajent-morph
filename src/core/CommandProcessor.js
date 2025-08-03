@@ -181,8 +181,13 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
   }
   
   async processIntelligentDecision(message, elements) {
-    // Check if there are elements selected first, before calling LLM
-    if (!elements || elements.length === 0) {
+    // Special case: Claude Code instructions don't require selected elements
+    const isClaudeCodeRequest = message.toLowerCase().includes('claude code') || 
+                               message.toLowerCase().includes('instruções') && message.toLowerCase().includes('ide') ||
+                               message.toLowerCase().includes('gerar instruções');
+    
+    // Check if there are elements selected first, before calling LLM (except for Claude Code instructions)
+    if (!isClaudeCodeRequest && (!elements || elements.length === 0)) {
       return {
         message: 'Por favor, selecione um elemento na página antes de executar comandos! 👆',
         success: false,
@@ -213,7 +218,10 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
       // Create a context-rich prompt for the LLM that includes element information and selectors
       let contextPrompt = `User command: "${message}"\n\n`;
       
-      if (elements.length > 0) {
+      if (isClaudeCodeRequest) {
+        contextPrompt += `SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n`;
+        contextPrompt += `No elements need to be selected for this request - it works with stored change history only.\n\n`;
+      } else if (elements && elements.length > 0) {
         contextPrompt += `Selected elements (these will be passed to tools as elementSelectors parameter):\n`;
         elements.forEach((element, index) => {
           const elementInfo = this.inspector.getElementInfo(element);
@@ -235,9 +243,30 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
    - description: what to create  
    - elementSelectors: selectors for reference elements (can be empty)
 
-3. **For element deletion:** Call deleteElement tool with:
+3. **For interactive element creation:** Call createInteractiveElement tool with:
+   - description: what to create
+   - html: complete HTML code
+   - css: styling
+   - javascript: behavior code
+   - elementSelectors: reference elements (can be empty)
+
+4. **For adding behavior:** Call addBehavior tool with:
+   - description: behavior to add
+   - elementSelectors: target elements
+   - events: event handlers object
+
+5. **For script execution:** Call executeScript tool with:
+   - description: what script does
+   - code: JavaScript code
+   - context: execution context
+
+6. **For element deletion:** Call deleteElement tool with:
    - elementSelectors: selectors for elements to delete
    - confirmation: true
+
+7. **For Claude Code instructions:** Call generateClaudeCodeInstructions tool with:
+   - requestType: "claude_code_instructions"
+   - NOTE: This tool works with change history only - no elements needed
 
 The element selectors will be used to reconstruct the DOM elements within the tools.`;
 

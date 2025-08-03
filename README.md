@@ -1,4 +1,4 @@
-# Design System Agent
+# Frontable
 
 Live design system editor with natural language commands.
 
@@ -24,13 +24,13 @@ Copy and paste the generated `dist/design-system-agent.min.js` into browser cons
 import DesignSystemAgent from 'design-system-agent';
 
 const agent = new DesignSystemAgent({
-  activationSequence: 'ajent'
+  activationSequence: 'frontable'
 });
 ```
 
 ## Activation
 
-Type `ajent` anywhere on the page to activate the agent.
+Type `frontable` anywhere on the page to activate the agent.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-/* Design System Agent Chat Panel */
+/* Frontable Chat Panel */
 .dsa-chat-panel {
   position: fixed !important;
   top: 20px !important;
@@ -395,6 +395,11 @@
 
 .dsa-messages::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+/* Highlight */
+.highlight {
+  color: #EF4444;
 }
 
 /* Responsive Design */

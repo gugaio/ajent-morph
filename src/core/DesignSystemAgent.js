@@ -5,7 +5,7 @@ import CommandProcessor from './CommandProcessor';
 class DesignSystemAgent {
   constructor(options = {}) {
     this.isActive = false;
-    this.activationSequence = options.activationSequence || 'ajent';
+    this.activationSequence = options.activationSequence || 'frontable';
     this.currentSequence = '';
     
     this.chatInterface = new ChatInterface();
@@ -62,7 +62,7 @@ class DesignSystemAgent {
   activate() {
     if (this.isActive) return;
     
-    console.log('🚀 Design System Agent activated!');
+    console.log('🚀 Frontable activated!');
     this.isActive = true;
     
     this.chatInterface.show();
@@ -72,7 +72,7 @@ class DesignSystemAgent {
     setTimeout(() => {
       this.chatInterface.addMessage({
         type: 'agent',
-        content: 'Olá! 👋 Sou seu assistente de design system inteligente!\n\n✨ **Detecção Automática:**\nEu entendo automaticamente o que você quer fazer:\n\n🎨 **Modificar**: "Deixe azul", "Maior", "Arredondar"\n🧩 **Criar**: "Adicione um botão", "Crie similar", "Novo elemento"\n\n💡 **Dica**: Use Shift+Click para seleção múltipla!'
+        content: 'Olá! Clique em qualquer elemento da página e me diga o que quer fazer.\n\n💡 Shift+Click para seleção múltipla'
       });
     }, 500);
   }
@@ -80,7 +80,7 @@ class DesignSystemAgent {
   deactivate() {
     if (!this.isActive) return;
     
-    console.log('❌ Design System Agent deactivated');
+    console.log('❌ Frontable deactivated');
     this.isActive = false;
     
     this.chatInterface.hide();

@@ -12,7 +12,7 @@ if (typeof window !== 'undefined') {
   const agent = new DesignSystemAgent();
   window.dsAgent = agent;
   
-  console.log('🤖 Design System Agent loaded! Type "ajent" to activate.');
+  console.log('🤖 Frontable loaded! Type "frontable" to activate.');
 }
 
 export default DesignSystemAgent;

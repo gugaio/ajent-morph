@@ -438,10 +438,118 @@ class ResponseApplier {
   }
     
   addToHistory(change) {
+    // Enrich change with more specific element context
+    if (change.element && typeof change.element === 'string') {
+      const element = document.querySelector(change.element);
+      if (element) {
+        change.elementContext = this.generateElementContext(element);
+      }
+    }
+    
     this.changeHistory.push(change);
     if (this.changeHistory.length > this.maxHistorySize) {
       this.changeHistory.shift();
     }
+  }
+
+  /**
+   * Generate rich context for an element to create specific CSS selectors
+   */
+  generateElementContext(element) {
+    const context = {
+      tagName: element.tagName.toLowerCase(),
+      id: element.id || null,
+      classes: Array.from(element.classList),
+      attributes: {},
+      position: null,
+      parentContext: null,
+      uniqueSelector: null
+    };
+
+    // Capture important attributes
+    ['data-*', 'role', 'type', 'name'].forEach(attr => {
+      if (attr === 'data-*') {
+        // Capture all data attributes
+        Array.from(element.attributes).forEach(a => {
+          if (a.name.startsWith('data-')) {
+            context.attributes[a.name] = a.value;
+          }
+        });
+      } else if (element.hasAttribute(attr)) {
+        context.attributes[attr] = element.getAttribute(attr);
+      }
+    });
+
+    // Get position among siblings of same type
+    const siblings = Array.from(element.parentNode?.children || [])
+      .filter(el => el.tagName === element.tagName);
+    context.position = siblings.indexOf(element) + 1;
+
+    // Get parent context (limited to 2 levels up)
+    if (element.parentElement && element.parentElement !== document.body) {
+      context.parentContext = {
+        tagName: element.parentElement.tagName.toLowerCase(),
+        id: element.parentElement.id || null,
+        classes: Array.from(element.parentElement.classList),
+        attributes: {}
+      };
+    }
+
+    // Generate unique selector
+    context.uniqueSelector = this.generateUniqueSelector(element);
+
+    return context;
+  }
+
+  /**
+   * Generate the most specific yet practical CSS selector for an element
+   */
+  generateUniqueSelector(element) {
+    // Priority order: ID > unique class combination > parent context + classes > nth-child
+    
+    // 1. If element has ID, use it (most specific)
+    if (element.id) {
+      return `#${element.id}`;
+    }
+
+    // 2. Try class combinations
+    if (element.classList.length > 0) {
+      const classSelector = '.' + Array.from(element.classList).join('.');
+      const elementsWithSameClasses = document.querySelectorAll(classSelector);
+      if (elementsWithSameClasses.length === 1) {
+        return classSelector;
+      }
+    }
+
+    // 3. Use parent context + classes/tag
+    if (element.parentElement) {
+      const parentSelector = element.parentElement.id 
+        ? `#${element.parentElement.id}`
+        : element.parentElement.classList.length > 0
+        ? '.' + Array.from(element.parentElement.classList).join('.')
+        : element.parentElement.tagName.toLowerCase();
+
+      const childSelector = element.classList.length > 0
+        ? '.' + Array.from(element.classList).join('.')
+        : element.tagName.toLowerCase();
+
+      const combinedSelector = `${parentSelector} > ${childSelector}`;
+      const elementsWithCombined = document.querySelectorAll(combinedSelector);
+      if (elementsWithCombined.length === 1) {
+        return combinedSelector;
+      }
+    }
+
+    // 4. Fall back to nth-child if needed
+    if (element.parentElement) {
+      const siblings = Array.from(element.parentElement.children);
+      const index = siblings.indexOf(element) + 1;
+      const parentSelector = element.parentElement.tagName.toLowerCase();
+      return `${parentSelector} > :nth-child(${index})`;
+    }
+
+    // 5. Last resort: basic tag selector
+    return element.tagName.toLowerCase();
   }
     
   getHistory() {

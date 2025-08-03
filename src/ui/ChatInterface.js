@@ -22,11 +22,7 @@ class ChatInterface {
     this.panel.innerHTML = `
       <div class="dsa-chat-header">
         <div>
-          <div class="dsa-title">Design System Agent</div>
-          <div class="dsa-status">
-            <span class="dsa-status-dot"></span>
-            Ready to help
-          </div>
+          <div class="dsa-title">Frontable</div>
         </div>
         <button class="dsa-close-btn">×</button>
       </div>
@@ -51,6 +47,7 @@ class ChatInterface {
           <div class="dsa-suggestion" data-command="Aumentar espaçamento">📏 Espaçamento</div>
           <div class="dsa-suggestion" data-command="Criar elemento similar">🔄 Criar similar</div>
           <div class="dsa-suggestion" data-command="Adicionar mais um botão">➕ Adicionar elemento</div>
+          <div class="dsa-suggestion dsa-special-suggestion" data-command="Gerar instruções Claude Code">⚡ Instruções para IDE</div>
         </div>
       </div>
     `;

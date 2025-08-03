@@ -15,6 +15,7 @@ class DOMManipulationAgent extends Agent {
     this.addTool(new Tool('addBehavior', 'Add JavaScript behavior to existing elements. Call with: {"description": "what_behavior_to_add", "elementSelectors": ["#id", ".class"], "events": {"click": "alert(\'clicked\')", "mouseenter": "this.style.opacity=0.8"}}', (params) => this.addBehaviorWrapper(params)));
     this.addTool(new Tool('executeScript', 'Execute custom JavaScript in page context. Call with: {"description": "what_script_does", "code": "console.log(\'hello\')", "context": "global"}', (params) => this.executeScriptWrapper(params)));
     this.addTool(new Tool('deleteElement', 'Delete selected DOM elements. Call with: {"elementSelectors": ["#id", ".class"], "confirmation": true}', (params) => this.deleteElementWrapper(params)));
+    this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
   }
 
   instruction = () => {
@@ -74,6 +75,12 @@ class DOMManipulationAgent extends Agent {
 **When:** User wants to remove elements from the page  
 **Examples:** "remova este elemento", "delete", "apague isso", "remove this"
 **Action:** Call deleteElement tool
+
+#### 7. CLAUDE CODE INSTRUCTIONS INTENT
+**When:** User wants to generate instructions for Claude Code IDE to implement changes
+**Examples:** "Gerar instruções Claude Code", "Instruções para IDE", "Claude Code instructions", "generate IDE instructions"
+**Action:** Call generateClaudeCodeInstructions tool, then parse and analyze the returned JSON data
+**NOTE:** This tool returns a JSON string with changeHistory array containing elementContext - you must parse, analyze, and create specific instructions using unique selectors
 
 ## CRITICAL: WHEN NOT TO USE TOOLS
 
@@ -181,6 +188,19 @@ class DOMManipulationAgent extends Agent {
   "confirmation": true // required for safety
 }
 \`\`\`
+
+### For Claude Code Instructions (generateClaudeCodeInstructions):
+**CRITICAL:** You must call generateClaudeCodeInstructions with NO parameters:
+\`\`\`javascript
+generateClaudeCodeInstructions()
+\`\`\`
+
+**IMPORTANT for generateClaudeCodeInstructions:**
+- This tool does NOT require any parameters or selected elements
+- It returns a JSON string containing: {changeHistory: [], totalChanges: number, message: string}
+- You MUST parse the JSON, analyze the changeHistory array, and create detailed Claude Code instructions
+- Each change has: timestamp, element, command, response, previousState, appliedChanges, elementContext
+- Use elementContext.uniqueSelector for specific CSS targeting instead of generic selectors
 
 
 ## CSS GENERATION GUIDELINES
@@ -383,6 +403,24 @@ deleteElement({
 })
 \`\`\`
 
+### Example 11: Claude Code Instructions Generation
+**User:** "Gerar instruções Claude Code"
+**Your call:**
+\`\`\`javascript
+generateClaudeCodeInstructions()
+\`\`\`
+
+**Your follow-up:** 
+1. The tool returns a JSON string - parse it to get the changeHistory array
+2. Analyze each change in the array (CSS modifications, elements created, etc.)
+3. For each change, use elementContext.uniqueSelector for specific targeting
+4. Create comprehensive, actionable instructions for Claude Code IDE with precise selectors
+5. Use final_answer with the formatted instructions as a string
+
+**Example of improved instruction generation:**
+Instead of: "Alterar estilo do texto para itálico no elemento <p>"
+Generate: "Alterar estilo do texto para itálico no elemento .hero-text p:first-child"
+
 ## INTERACTIVE ELEMENT BEST PRACTICES
 
 ### JavaScript Safety and Power
@@ -436,15 +474,23 @@ Consider accessibility in your style suggestions:
 **CRITICAL:** After completing any DOM manipulation task (applyStyles, createElement, or deleteElement), you MUST use the "final_answer" tool to indicate that you have completed your task or reasoning and are returning a final response to the user.
 
 ### Workflow Pattern:
-1. 🎯 **Identify Intent**: Analyze user command (modify, create, or delete)
-2. 🔧 **Execute Tool**: Call appropriate tool (applyStyles, createElement, deleteElement)
-3. ✅ **Provide Final Answer**: Use final_answer tool with a user-friendly summary
+1. 🎯 **Identify Intent**: Analyze user command (modify, create, delete, or Claude Code instructions)
+2. 🔧 **Execute Tool**: Call appropriate tool (applyStyles, createElement, deleteElement, generateClaudeCodeInstructions)
+3. 📊 **Process Results**: For Claude Code instructions, analyze the returned changeHistory object
+4. ✅ **Provide Final Answer**: Use final_answer tool with formatted instructions or summary
 
 ### Example Final Answer Usage:
 After calling applyStyles tool:
 \`\`\`
 final_answer({
   "response": "✅ Cor do texto alterada para vermelho com sucesso! O elemento agora possui a cor vermelha aplicada."
+})
+\`\`\`
+
+After calling generateClaudeCodeInstructions tool:
+\`\`\`
+final_answer({
+  "response": "🎯 **Instruções para Claude Code IDE:**\\n\\n## Modificações CSS\\n1. Alterar cor do texto para azul no elemento .button\\n   - color: blue\\n\\n## Elementos Criados\\n1. Novo botão com HTML: <button>Click Me</button>\\n\\n## Implementação\\n- Adicione as modificações CSS ao arquivo de estilos\\n- Integre novos elementos nos templates apropriados"
 })
 \`\`\`
 
@@ -1605,6 +1651,70 @@ Current Styling:`;
       code: params.code,
       context: params.context || 'global'
     });
+  }
+
+  async generateClaudeCodeInstructions(params) {
+    // Return raw change history for LLM to process
+    console.log('generateClaudeCodeInstructions called with params:', params);
+    
+    try {
+      // Get raw change history from ResponseApplier
+      const history = this.applier.getHistory();
+      
+      if (!history || history.length === 0) {
+        return 'No changes made yet. Make some modifications first before requesting instructions.';
+      }
+      
+      // Return raw history data as JSON string for LLM to analyze
+      const historyData = {
+        changeHistory: history,
+        totalChanges: history.length,
+        message: `Raw change history with ${history.length} modifications ready for Claude Code instruction generation.`
+      };
+      
+      return JSON.stringify(historyData, null, 2);
+      
+    } catch (error) {
+      console.error('Error getting change history:', error);
+      return `Failed to get change history: ${error.message}`;
+    }
+  }
+
+
+  async generateClaudeCodeInstructionsWrapper(params) {
+    console.log('generateClaudeCodeInstructionsWrapper called with params:', params);
+    
+    if (!params) {
+      // Default to claude_code_instructions if no params provided
+      return this.generateClaudeCodeInstructions({ requestType: 'claude_code_instructions' });
+    }
+    
+    // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
+    let actualParams = params;
+    if (params.params && typeof params.params === 'string') {
+      try {
+        // Handle incomplete JSON (common with LLM generation)
+        let jsonString = params.params;
+        if (jsonString === '{' || jsonString === '{"' || jsonString.includes('claude_code_instructions')) {
+          // If it's incomplete or contains our target, assume it's meant to be claude_code_instructions
+          actualParams = { requestType: 'claude_code_instructions' };
+        } else {
+          actualParams = JSON.parse(jsonString);
+        }
+        console.log('Parsed actualParams for generateClaudeCodeInstructions:', actualParams);
+      } catch (error) {
+        console.warn('Failed to parse params.params, using default:', error);
+        // Default to claude_code_instructions on parse error
+        actualParams = { requestType: 'claude_code_instructions' };
+      }
+    }
+    
+    // If no requestType provided, default to claude_code_instructions
+    if (!actualParams.requestType) {
+      actualParams.requestType = 'claude_code_instructions';
+    }
+    
+    return this.generateClaudeCodeInstructions(actualParams);
   }
 }
 
