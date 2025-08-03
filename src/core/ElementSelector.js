@@ -8,6 +8,7 @@ class ElementSelector {
     this.multiSelectedElements = [];
     this.multiOverlays = [];
     this.onSelectionChange = null;
+    this.lastSelectedElements = []; // Track last selected elements for reuse
     
     this.createOverlay();
   }
@@ -26,6 +27,7 @@ class ElementSelector {
     if (this.isEnabled) return;
     
     this.isEnabled = true;
+    this.multipleSelectionEnabled = true; // Always enable multiple selection
     document.addEventListener('mouseover', this.handleMouseOver);
     document.addEventListener('mouseout', this.handleMouseOut);
     document.addEventListener('click', this.handleClick);
@@ -34,6 +36,7 @@ class ElementSelector {
   disable() {
     this.isEnabled = false;
     this.clearSelection();
+    this.clearMultiSelection();
     document.removeEventListener('mouseover', this.handleMouseOver);
     document.removeEventListener('mouseout', this.handleMouseOut);
     document.removeEventListener('click', this.handleClick);
@@ -44,7 +47,6 @@ class ElementSelector {
     if (e.target.closest('.dsa-chat-panel')) return;
     if (this.selectedElement) return; // Stop hovering after selection
     
-    console.log('Hovering over:', e.target);
     this.hoveredElement = e.target;
     this.showOverlay(e.target);
   };
@@ -65,8 +67,8 @@ class ElementSelector {
     e.preventDefault();
     e.stopPropagation();
     
-    if (this.multipleSelectionEnabled && e.ctrlKey) {
-      // Handle multiple selection with Ctrl+Click
+    if (this.multipleSelectionEnabled && e.shiftKey) {
+      // Handle multiple selection with Shift+Click
       this.toggleMultiSelection(e.target);
     } else if (this.multipleSelectionEnabled) {
       // Single selection in multi mode
@@ -160,6 +162,7 @@ class ElementSelector {
     if (!this.multiSelectedElements.includes(element)) {
       this.multiSelectedElements.push(element);
       this.showMultiSelectedOverlay(element);
+      this.updateLastSelectedElements();
       this.notifySelectionChange();
     }
   }
@@ -169,6 +172,7 @@ class ElementSelector {
     if (index > -1) {
       this.multiSelectedElements.splice(index, 1);
       this.hideOverlayForElement(element);
+      this.updateLastSelectedElements();
       this.notifySelectionChange();
     }
   }
@@ -176,6 +180,7 @@ class ElementSelector {
   clearMultiSelection() {
     this.multiSelectedElements = [];
     this.clearAllMultiOverlays();
+    this.forceRemoveAllSelectionOverlays(); // Add extra cleanup
     this.notifySelectionChange();
   }
 
@@ -246,6 +251,33 @@ class ElementSelector {
     this.multiOverlays = [];
   }
 
+  forceRemoveAllSelectionOverlays() {
+    // Force remove any remaining selection overlays that might be stuck in DOM
+    const allMultiOverlays = document.querySelectorAll('.dsa-multi-selector-overlay');
+    const allCounters = document.querySelectorAll('.dsa-selection-counter');
+    
+    allMultiOverlays.forEach(overlay => {
+      try {
+        overlay.remove();
+      } catch (e) {
+        console.warn('Could not remove overlay:', e);
+      }
+    });
+    
+    allCounters.forEach(counter => {
+      try {
+        counter.remove();
+      } catch (e) {
+        console.warn('Could not remove counter:', e);
+      }
+    });
+    
+    // Clear the arrays to reset state
+    this.multiOverlays = [];
+    
+    console.log('🧹 Force removed all selection overlays');
+  }
+
   getElementId(element) {
     // Create a unique identifier for the element
     if (element.id) return element.id;
@@ -261,6 +293,45 @@ class ElementSelector {
     if (this.onSelectionChange) {
       this.onSelectionChange(this.multiSelectedElements);
     }
+  }
+
+  updateLastSelectedElements() {
+    // Save current selection as last selected (only valid DOM elements)
+    this.lastSelectedElements = this.multiSelectedElements.filter(element => 
+      element && element.nodeType && element.nodeType === Node.ELEMENT_NODE && 
+      document.contains(element) // Ensure element is still in DOM
+    );
+    console.log('💾 Saved last selected elements:', this.lastSelectedElements.length);
+  }
+
+  restoreLastSelection() {
+    // Restore last selected elements if they're still valid and in DOM
+    const validLastElements = this.lastSelectedElements.filter(element => 
+      element && element.nodeType && element.nodeType === Node.ELEMENT_NODE && 
+      document.contains(element)
+    );
+
+    if (validLastElements.length > 0) {
+      this.clearMultiSelection();
+      validLastElements.forEach(element => {
+        this.multiSelectedElements.push(element);
+        this.showMultiSelectedOverlay(element);
+      });
+      this.notifySelectionChange();
+      console.log('🔄 Restored last selection:', validLastElements.length, 'elements');
+      return true;
+    }
+    
+    console.log('❌ No valid last selection to restore');
+    return false;
+  }
+
+  hasLastSelection() {
+    const validLastElements = this.lastSelectedElements.filter(element => 
+      element && element.nodeType && element.nodeType === Node.ELEMENT_NODE && 
+      document.contains(element)
+    );
+    return validLastElements.length > 0;
   }
 }
 

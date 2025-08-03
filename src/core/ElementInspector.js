@@ -83,6 +83,7 @@ class ElementInspector {
      */
   getElementInfo(element) {
     const rect = element.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(element);
       
     return {
       tagName: element.tagName.toLowerCase(),
@@ -98,10 +99,37 @@ class ElementInspector {
       textContent: element.textContent?.trim() || null,
       innerHTML: element.innerHTML?.length > 200 
         ? element.innerHTML.substring(0, 200) + '...' 
-        : element.innerHTML
+        : element.innerHTML,
+      computedStyles: this.getRelevantComputedStyles(computedStyle)
     };
   }
     
+  /**
+     * Extrai estilos computados mais relevantes para análise
+     */
+  getRelevantComputedStyles(computedStyle) {
+    const relevantProps = [
+      // Colors & Backgrounds
+      'color', 'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundPosition',
+      // Typography  
+      'fontSize', 'fontFamily', 'fontWeight', 'lineHeight', 'textAlign',
+      // Layout & Spacing
+      'width', 'height', 'padding', 'margin', 'display', 'position',
+      // Borders & Effects
+      'border', 'borderRadius', 'boxShadow', 'opacity'
+    ];
+
+    const styles = {};
+    relevantProps.forEach(prop => {
+      const value = computedStyle.getPropertyValue(this.camelToKebab(prop));
+      if (value && value !== 'none' && value !== 'auto' && value !== 'normal' && value !== '0px') {
+        styles[prop] = value;
+      }
+    });
+
+    return styles;
+  }
+
   /**
      * Detecta se o elemento faz parte de um design system
      */

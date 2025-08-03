@@ -23,24 +23,33 @@ class CommandProcessor {
   }
   
   async process(message, context = {}) {
-    const { selectedElement, mode, elementsData } = context;
+    const { selectedElement, selectedElements, mode, elementsData } = context;
     
-    // Only check for selectedElement if we're not in component generation mode
-    if (!selectedElement && mode !== 'component_generation') {
+    // Support both old (selectedElement) and new (selectedElements) formats
+    const elements = selectedElements || (selectedElement ? [selectedElement] : []);
+    const firstElement = elements.length > 0 ? elements[0] : null;
+    
+    // Only check for selection if we're not in component generation mode
+    // Note: intelligent_decision mode can work with or without selected elements
+    if (!firstElement && mode !== 'component_generation' && mode !== 'intelligent_decision') {
       return {
         message: 'Por favor, clique em um elemento da página primeiro para que eu possa editá-lo! 👆'
       };
     }
-    
     try {
       if (mode === 'component_generation') {
         // Handle component generation mode
         return await this.processComponentGeneration(message, elementsData);
       }
       
+      if (mode === 'intelligent_decision') {
+        // Handle intelligent decision mode using DOMManipulationAgent
+        return await this.processIntelligentDecision(message, elements);
+      }
+      
       // Original CSS modification logic
       // Gera contexto para LLM
-      const contextPrompt = this.inspector.generateContextPrompt(selectedElement, message);
+      const contextPrompt = this.inspector.generateContextPrompt(firstElement, message);
       
       // Tenta chamar LLM primeiro
       let llmResponse;
@@ -49,13 +58,12 @@ class CommandProcessor {
       } catch (error) {
         console.warn('LLM call failed, using local fallback:', error.message);
         // Fallback para sistema local
-        return await this.processLocalCommand(message, selectedElement);
+        return await this.createLocalFallbackResponse(message, firstElement);
       }
-      
       // Aplica resposta da LLM
       const result = await this.applier.applyLLMResponse(
         llmResponse, 
-        selectedElement, 
+        firstElement, 
         message
       );
       
@@ -172,6 +180,125 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
     }
   }
   
+  async processIntelligentDecision(message, elements) {
+    // Check if there are elements selected first, before calling LLM
+    if (!elements || elements.length === 0) {
+      return {
+        message: 'Por favor, selecione um elemento na página antes de executar comandos! 👆',
+        success: false,
+        noElementsSelected: true
+      };
+    }
+
+    if (!this.squad) {
+      // Fallback to local processing if no LLM available
+      return await this.createLocalFallbackResponse(message, elements[0]);
+    }
+
+    try {
+      // Convert elements to selectors to avoid serialization issues
+      const elementSelectors = elements.map(element => {
+        if (this.squad && this.squad.agents && this.squad.agents[0]) {
+          return this.squad.agents[0].getElementSelector(element);
+        }
+        // Fallback selector generation
+        if (element.id) return `#${element.id}`;
+        if (element.className) {
+          const classes = Array.from(element.classList).slice(0, 2);
+          return `.${classes.join('.')}`;
+        }
+        return element.tagName.toLowerCase();
+      }).filter(Boolean);
+
+      // Create a context-rich prompt for the LLM that includes element information and selectors
+      let contextPrompt = `User command: "${message}"\n\n`;
+      
+      if (elements.length > 0) {
+        contextPrompt += `Selected elements (these will be passed to tools as elementSelectors parameter):\n`;
+        elements.forEach((element, index) => {
+          const elementInfo = this.inspector.getElementInfo(element);
+          const selector = elementSelectors[index];
+          contextPrompt += `Element ${index + 1} (selector: ${selector}): ${JSON.stringify(elementInfo, null, 2)}\n`;
+        });
+      } else {
+        contextPrompt += `No elements selected.\n`;
+      }
+      
+      contextPrompt += `\nPlease analyze this command and call the appropriate tool:
+
+1. **For CSS modifications:** Call applyStyles tool with:
+   - description: clear description of visual change
+   - styles: CSS property-value pairs
+   - elementSelectors: array of CSS selectors for target elements
+
+2. **For element creation:** Call createElement tool with:
+   - description: what to create  
+   - elementSelectors: selectors for reference elements (can be empty)
+
+3. **For element deletion:** Call deleteElement tool with:
+   - elementSelectors: selectors for elements to delete
+   - confirmation: true
+
+The element selectors will be used to reconstruct the DOM elements within the tools.`;
+
+      console.log('Sending intelligent decision prompt to LLM:', contextPrompt);
+
+      // Set the element selectors in a way the agent can access them
+      if (this.squad && this.squad.agents && this.squad.agents[0]) {
+        this.squad.agents[0].currentElementSelectors = elementSelectors;
+        this.squad.agents[0].currentSelectedElements = elements; // Keep as backup
+      }
+
+      // Use the LLM squad to process the intelligent decision
+      const response = await this.callLLM(contextPrompt);
+      
+      console.log('LLM response for intelligent decision:', response);
+
+      // Clean up
+      if (this.squad && this.squad.agents && this.squad.agents[0]) {
+        delete this.squad.agents[0].currentElementSelectors;
+        delete this.squad.agents[0].currentSelectedElements;
+      }
+
+      // The response can be a string (from final_answer) or an object with properties
+      const messageContent = typeof response === 'string' ? response : (response.message || 'Comando processado com sucesso!');
+      
+      return {
+        message: messageContent,
+        success: response.success !== false,
+        appliedCount: response.appliedCount,
+        failedCount: response.failedCount,
+        results: response.results,
+        canUndo: response.canUndo,
+        html: response.html,
+        action: response.action
+      };
+
+    } catch (error) {
+      console.error('Intelligent decision processing failed:', error);
+      // Fallback to local processing
+      const firstElement = elements && elements.length > 0 ? elements[0] : null;
+      return await this.createLocalFallbackResponse(message, firstElement);
+    }
+  }
+
+  async createLocalFallbackResponse(message, element) {
+    // Simple local fallback when LLM is not available
+    if (!element) {
+      return {
+        message: 'Por favor, selecione um elemento na página antes de executar comandos! 👆',
+        success: false,
+        noElementsSelected: true
+      };
+    }
+    
+    return {
+      message: `Comando "${message}" foi recebido, mas o sistema de IA não está disponível. Por favor, tente novamente ou verifique a configuração da API.`,
+      success: false,
+      fallback: true
+    };
+  }
+
   // Verifica se AI está disponível
   isAIAvailable() {
     return this.hasAI && this.squad !== null;

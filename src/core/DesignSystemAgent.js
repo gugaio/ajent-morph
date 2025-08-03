@@ -8,13 +8,6 @@ class DesignSystemAgent {
     this.activationSequence = options.activationSequence || 'ajent';
     this.currentSequence = '';
     
-    // Operating modes
-    this.modes = {
-      MODIFY_CSS: 'modify',
-      CREATE_COMPONENT: 'create'
-    };
-    this.currentMode = this.modes.MODIFY_CSS;
-    
     this.chatInterface = new ChatInterface();
     this.elementSelector = new ElementSelector();
     this.commandProcessor = new CommandProcessor('faab7706-adec-498e-bf2a-6da0ffe8ae82');
@@ -29,21 +22,18 @@ class DesignSystemAgent {
     // Setup message handling
     this.chatInterface.onMessage = (message) => this.handleUserMessage(message);
     this.chatInterface.onClose = () => this.deactivate();
-    this.chatInterface.onModeChange = (mode) => this.toggleMode(mode);
     this.chatInterface.onClearSelection = () => this.elementSelector.clearMultiSelection();
     
     // Setup element selection change notification
     this.elementSelector.onSelectionChange = (elements) => {
-      if (this.currentMode === this.modes.CREATE_COMPONENT) {
-        this.chatInterface.showSelectionPreview(elements);
-      }
+      this.chatInterface.showSelectionPreview(elements);
     };
   }
   
   handleKeydown(e) {
     // Handle ESC key when agent is active (but not when typing in chat)
     if (this.isActive && e.key === 'Escape' && !e.target.matches('.dsa-input')) {
-      this.elementSelector.clearSelection();
+      this.elementSelector.clearMultiSelection();
       return;
     }
     
@@ -82,7 +72,7 @@ class DesignSystemAgent {
     setTimeout(() => {
       this.chatInterface.addMessage({
         type: 'agent',
-        content: 'Olá! 👋 Sou seu assistente de design system. Agora posso modificar CSS e criar componentes!\n\n🎨 **Modo Modificar CSS:**\n• "Deixe este botão azul"\n• "Aumente o espaçamento"\n• "Mude a fonte para bold"\n\n🧩 **Modo Criar Componente:**\n• Selecione elementos com Ctrl+Click\n• "Crie um header baseado neste botão"\n• "Combine estes elementos em um card"'
+        content: 'Olá! 👋 Sou seu assistente de design system inteligente!\n\n✨ **Detecção Automática:**\nEu entendo automaticamente o que você quer fazer:\n\n🎨 **Modificar**: "Deixe azul", "Maior", "Arredondar"\n🧩 **Criar**: "Adicione um botão", "Crie similar", "Novo elemento"\n\n💡 **Dica**: Use Shift+Click para seleção múltipla!'
       });
     }, 500);
   }
@@ -110,14 +100,13 @@ class DesignSystemAgent {
           type: 'agent',
           content: undoResult.message
         });
+        // Clear selection after undo command
+        this.clearSelectionAfterCommand();
         return;
       }
       
-      if (this.currentMode === this.modes.CREATE_COMPONENT) {
-        await this.handleComponentCreation(message);
-      } else {
-        await this.handleCSSModification(message);
-      }
+      // Send message directly to the LLM agent to decide action
+      await this.handleUserCommand(message);
       
     } catch (error) {
       this.chatInterface.hideTyping();
@@ -126,81 +115,169 @@ class DesignSystemAgent {
         content: 'Desculpe, não consegui processar esse comando. Pode tentar de outra forma?'
       });
       console.error('Command processing error:', error);
+      
+      // Clear selection even on error to prevent confusion
+      this.clearSelectionAfterCommand();
+    }
+  }
+
+  async handleUserCommand(message) {
+    let result = null;
+    
+    try {
+      // Get selected elements
+      let selectedElements = this.elementSelector.getMultiSelectedElements();
+      
+      // If no elements are currently selected, try to restore last selection
+      if (selectedElements.length === 0 && this.elementSelector.hasLastSelection()) {
+        console.log('🔄 No current selection, attempting to restore last selection...');
+        const restored = this.elementSelector.restoreLastSelection();
+        if (restored) {
+          selectedElements = this.elementSelector.getMultiSelectedElements();
+          
+          // Show user-friendly message about restoration
+          this.chatInterface.addMessage({
+            type: 'agent',
+            content: `🔄 Restaurei a seleção anterior (${selectedElements.length} elemento(s)) para executar o comando.`
+          });
+        }
+      }
+      
+      // Process the command with the LLM agent to determine action and execute it
+      result = await this.commandProcessor.process(message, {
+        selectedElements: selectedElements,
+        mode: 'intelligent_decision'
+      });
+      
+      // Hide typing
+      this.chatInterface.hideTyping();
+      
+      // Show result
+      this.chatInterface.addMessage({
+        type: 'agent',
+        content: result.message
+      });
+      
+      // Apply changes if any
+      if (result.changes) {
+        this.applyChanges(result.changes);
+      }
+      
+      // Insert HTML if provided (for element creation)
+      if (result.html && result.html.trim()) {
+        this.insertGeneratedHTML(result.html);
+      }
+      
+    } finally {
+      // Only clear selection if the command was successful or if it's not about missing elements
+      if (result && (result.success !== false || !result.noElementsSelected)) {
+        this.clearSelectionAfterCommand();
+      }
     }
   }
 
   async handleCSSModification(message) {
-    // Process the command (existing functionality)
-    const result = await this.commandProcessor.process(message, {
-      selectedElement: this.elementSelector.getSelectedElement()
-    });
-    
-    // Hide typing
-    this.chatInterface.hideTyping();
-    
-    // Show result
-    this.chatInterface.addMessage({
-      type: 'agent',
-      content: result.message
-    });
-    
-    // Apply changes if any
-    if (result.changes) {
-      this.applyChanges(result.changes);
+    try {
+      // Get selected elements (now unified system)
+      const selectedElements = this.elementSelector.getMultiSelectedElements();
+      const selectedElement = selectedElements.length > 0 ? selectedElements[0] : null;
+      
+      console.log('CSS Modification - Selected elements:', selectedElements);
+      console.log('CSS Modification - First element:', selectedElement);
+      
+      // Process the command (existing functionality)
+      const result = await this.commandProcessor.process(message, {
+        selectedElement: selectedElement
+      });
+      
+      // Hide typing
+      this.chatInterface.hideTyping();
+      
+      // Show result
+      this.chatInterface.addMessage({
+        type: 'agent',
+        content: result.message
+      });
+      
+      // Apply changes if any
+      if (result.changes) {
+        this.applyChanges(result.changes);
+      }
+      
+    } finally {
+      // ALWAYS clear selection after command
+      this.clearSelectionAfterCommand();
     }
-    
-    // Clear selection after command is processed
-    this.elementSelector.clearSelection();
   }
 
   async handleComponentCreation(message) {
-    // Extract HTML and CSS from selected elements
-    const selectedElements = this.elementSelector.getMultiSelectedElements();
-    if (selectedElements.length === 0) {
-      this.chatInterface.hideTyping();
-      this.chatInterface.addMessage({
-        type: 'agent',
-        content: 'Por favor, selecione um ou mais elementos para criar um componente. Use Ctrl+Click para seleção múltipla.'
-      });
-      return;
-    }
-    
-    const elementsData = this.extractElementsData(selectedElements);
-    
-    // Generate component using LLM via CommandProcessor
-    const result = await this.commandProcessor.process(message, {
-      mode: 'component_generation',
-      elementsData: elementsData
-    });
-    
-    this.chatInterface.hideTyping();
-    
-    if (result.success) {
-      console.log('LLM Response for component:', result.html);
-      
-      // Insert the generated HTML
-      if (result.html && result.html.trim()) {
-        this.insertGeneratedHTML(result.html);
+    try {
+      // Extract HTML and CSS from selected elements
+      const selectedElements = this.elementSelector.getMultiSelectedElements();
+      if (selectedElements.length === 0) {
+        this.chatInterface.hideTyping();
         this.chatInterface.addMessage({
           type: 'agent',
-          content: result.message || 'Componente criado com sucesso!'
+          content: 'Por favor, selecione um ou mais elementos para criar um componente. Use Shift+Click para seleção múltipla.'
         });
+        return;
+      }
+      
+      const elementsData = this.extractElementsData(selectedElements);
+      
+      // Generate component using LLM via CommandProcessor
+      const result = await this.commandProcessor.process(message, {
+        mode: 'component_generation',
+        elementsData: elementsData
+      });
+      
+      this.chatInterface.hideTyping();
+      
+      if (result.success) {
+        console.log('LLM Response for component:', result.html);
+        
+        // Insert the generated HTML
+        if (result.html && result.html.trim()) {
+          this.insertGeneratedHTML(result.html);
+          this.chatInterface.addMessage({
+            type: 'agent',
+            content: result.message || 'Componente criado com sucesso!'
+          });
+        } else {
+          console.warn('No HTML content received from LLM');
+          this.chatInterface.addMessage({
+            type: 'agent',
+            content: 'Componente processado, mas não foi possível inserir HTML.'
+          });
+        }
       } else {
-        console.warn('No HTML content received from LLM');
         this.chatInterface.addMessage({
           type: 'agent',
-          content: 'Componente processado, mas não foi possível inserir HTML.'
+          content: result.message || 'Não foi possível criar o componente.'
         });
       }
-    } else {
-      this.chatInterface.addMessage({
-        type: 'agent',
-        content: result.message || 'Não foi possível criar o componente.'
-      });
+      
+    } finally {
+      // ALWAYS clear selection after component creation
+      this.clearSelectionAfterCommand();
     }
+  }
+
+  /**
+   * Centralized method to clear element selection after any command
+   * This ensures consistent behavior and prevents lingering selections
+   */
+  clearSelectionAfterCommand() {
+    // Save current selection as last selected before clearing
+    this.elementSelector.updateLastSelectedElements();
     
-    // Clear selection
+    // Clear the multi-selection
     this.elementSelector.clearMultiSelection();
+    
+    // Also update the chat interface to remove selection preview
+    this.chatInterface.showSelectionPreview([]);
+    
+    console.log('🧹 Element selection cleared after command execution');
   }
 
   async undoLastChange() {
@@ -233,18 +310,6 @@ class DesignSystemAgent {
     });
   }
 
-  toggleMode(mode) {
-    const oldMode = this.currentMode;
-    this.currentMode = mode;
-    
-    if (mode === this.modes.CREATE_COMPONENT) {
-      this.elementSelector.enableMultipleSelection();
-    } else {
-      this.elementSelector.disableMultipleSelection();
-    }
-    
-    console.log(`Mode changed from ${oldMode} to ${mode}`);
-  }
 
 
   extractElementsData(elements) {

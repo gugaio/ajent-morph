@@ -4,11 +4,9 @@ class ChatInterface {
     this.messagesContainer = null;
     this.inputField = null;
     this.isVisible = false;
-    this.currentMode = 'modify';
     
     this.onMessage = null;
     this.onClose = null;
-    this.onModeChange = null;
     
     this.createInterface();
   }
@@ -32,13 +30,6 @@ class ChatInterface {
         </div>
         <button class="dsa-close-btn">×</button>
       </div>
-
-      <div class="dsa-mode-toggle">
-        <input type="radio" id="mode-modify" name="mode" value="modify" checked>
-        <label for="mode-modify">🎨 Modificar CSS</label>
-        <input type="radio" id="mode-create" name="mode" value="create">
-        <label for="mode-create">🧩 Criar Componente</label>
-      </div>
       
       <div class="dsa-messages"></div>
       
@@ -46,7 +37,7 @@ class ChatInterface {
         <div class="dsa-input-wrapper">
           <textarea 
             class="dsa-input" 
-            placeholder="Descreva o que você quer alterar no design..."
+            placeholder="Descreva o que você quer fazer..."
             rows="1"
           ></textarea>
           <button class="dsa-send-btn">
@@ -55,17 +46,11 @@ class ChatInterface {
             </svg>
           </button>
         </div>
-        <div class="dsa-suggestions modify-suggestions">
+        <div class="dsa-suggestions">
           <div class="dsa-suggestion" data-command="Mudar cor do botão">🎨 Mudar cor</div>
           <div class="dsa-suggestion" data-command="Aumentar espaçamento">📏 Espaçamento</div>
-          <div class="dsa-suggestion" data-command="Deixar mais arredondado">🔵 Arredondar</div>
-          <div class="dsa-suggestion" data-command="Tornar texto maior">📝 Texto maior</div>
-        </div>
-        <div class="dsa-suggestions create-suggestions" style="display: none;">
-          <div class="dsa-suggestion" data-command="Criar elemento similar">🔄 Similar</div>
-          <div class="dsa-suggestion" data-command="Criar header baseado neste elemento">📋 Header</div>
-          <div class="dsa-suggestion" data-command="Criar card container">📦 Card</div>
-          <div class="dsa-suggestion" data-command="Combinar elementos selecionados">🔗 Combinar</div>
+          <div class="dsa-suggestion" data-command="Criar elemento similar">🔄 Criar similar</div>
+          <div class="dsa-suggestion" data-command="Adicionar mais um botão">➕ Adicionar elemento</div>
         </div>
       </div>
     `;
@@ -79,14 +64,6 @@ class ChatInterface {
     this.inputField = this.panel.querySelector('.dsa-input');
     const sendBtn = this.panel.querySelector('.dsa-send-btn');
     const closeBtn = this.panel.querySelector('.dsa-close-btn');
-    
-    // Mode toggle handling
-    const modeInputs = this.panel.querySelectorAll('input[name="mode"]');
-    modeInputs.forEach(input => {
-      input.addEventListener('change', (e) => {
-        this.handleModeChange(e.target.value);
-      });
-    });
     
     // Input handling
     this.inputField.addEventListener('keydown', (e) => {
@@ -118,37 +95,6 @@ class ChatInterface {
     });
   }
 
-  handleModeChange(mode) {
-    this.currentMode = mode;
-    
-    // Update placeholder text
-    const placeholder = mode === 'create' 
-      ? 'Descreva o componente que você quer criar...'
-      : 'Descreva o que você quer alterar no design...';
-    this.inputField.placeholder = placeholder;
-    
-    // Show/hide appropriate suggestions
-    const modifySuggestions = this.panel.querySelector('.modify-suggestions');
-    const createSuggestions = this.panel.querySelector('.create-suggestions');
-    
-    if (mode === 'create') {
-      modifySuggestions.style.display = 'none';
-      createSuggestions.style.display = 'flex';
-    } else {
-      modifySuggestions.style.display = 'flex';
-      createSuggestions.style.display = 'none';
-    }
-    
-    // Notify parent component
-    if (this.onModeChange) {
-      this.onModeChange(mode);
-    }
-    
-    // Add mode indicator to status
-    const statusText = this.panel.querySelector('.dsa-status');
-    const modeText = mode === 'create' ? 'Modo: Criar Componente' : 'Modo: Modificar CSS';
-    statusText.innerHTML = `<span class="dsa-status-dot"></span>${modeText}`;
-  }
   
   autoResizeTextarea() {
     this.inputField.style.height = 'auto';

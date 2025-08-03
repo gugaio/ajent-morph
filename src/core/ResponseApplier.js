@@ -207,6 +207,15 @@ class ResponseApplier {
      * Aplica estilos ao elemento
      */
   async applyStyles(element, styles) {
+    // Validate that element is a proper DOM element
+    if (!element || !element.nodeType || element.nodeType !== Node.ELEMENT_NODE) {
+      console.error('Invalid element passed to applyStyles:', element);
+      return {
+        applied: {},
+        failed: { 'invalid_element': { attempted: 'styles', reason: 'Element is not a valid DOM element' } }
+      };
+    }
+
     const appliedChanges = {};
     const failedChanges = {};
       
@@ -224,7 +233,6 @@ class ResponseApplier {
                                window.getComputedStyle(element)[normalizedProp];
           
         // Aplica o novo valor
-        debugger
         element.style[normalizedProp] = normalizedValue;
           
         // Verifica se foi aplicado com sucesso
@@ -268,23 +276,39 @@ class ResponseApplier {
      * Captura estado atual do elemento
      */
   captureElementState(element) {
-    const computedStyle = window.getComputedStyle(element);
-    const state = {};
-      
-    // Captura propriedades inline
-    if (element.style.cssText) {
-      state.inline = element.style.cssText;
+    // Validate that element is a proper DOM element
+    if (!element || !element.nodeType || element.nodeType !== Node.ELEMENT_NODE) {
+      console.error('Invalid element passed to captureElementState:', element);
+      return { inline: '' }; // Return minimal state
     }
-      
-    // Captura propriedades computadas relevantes
-    this.validCSSProperties.forEach(prop => {
-      const value = computedStyle.getPropertyValue(this.camelToKebab(prop));
-      if (value && value !== 'auto' && value !== 'normal') {
-        state[prop] = value;
+
+    try {
+      const computedStyle = window.getComputedStyle(element);
+      const state = {};
+        
+      // Captura propriedades inline
+      if (element.style && element.style.cssText) {
+        state.inline = element.style.cssText;
       }
-    });
-      
-    return state;
+        
+      // Captura propriedades computadas relevantes
+      this.validCSSProperties.forEach(prop => {
+        try {
+          const value = computedStyle.getPropertyValue(this.camelToKebab(prop));
+          if (value && value !== 'auto' && value !== 'normal') {
+            state[prop] = value;
+          }
+        } catch (error) {
+          // Skip properties that can't be accessed
+          console.warn(`Could not get computed style for property ${prop}:`, error);
+        }
+      });
+        
+      return state;
+    } catch (error) {
+      console.error('Error capturing element state:', error);
+      return { inline: element.style ? element.style.cssText : '' };
+    }
   }
     
   /**
@@ -375,15 +399,25 @@ class ResponseApplier {
       
     // Propriedades de cor
     if (this.isColorProperty(property)) {
-      return /^(#[0-9a-f]{3,6}|rgb\(|rgba\(|hsl\(|hsla\(|\w+)/.test(value);
+      return /^(#[0-9a-fA-F]{3,6}|rgb\(|rgba\(|hsl\(|hsla\(|\w+)/i.test(value);
     }
       
-    // Propriedades numéricas
+    // Propriedades que podem ter múltiplos valores (padding, margin)
+    if (this.canHaveMultipleValues(property)) {
+      return /^(\d+(\.\d+)?(px|em|rem|%|vh|vw)?\s*)+$/.test(value.trim());
+    }
+      
+    // Propriedades numéricas simples
     if (this.needsPixelUnit(property)) {
       return /^\d+(\.\d+)?(px|em|rem|%|vh|vw)?$/.test(value);
     }
       
     return true;
+  }
+
+  canHaveMultipleValues(property) {
+    const multiValueProperties = ['padding', 'margin', 'border-width', 'border-radius'];
+    return multiValueProperties.includes(property) || multiValueProperties.includes(this.camelToKebab(property));
   }
     
   camelToKebab(str) {
@@ -391,7 +425,7 @@ class ResponseApplier {
   }
     
   kebabToCamel(str) {
-    return str.replace(/-([a-z])/g, (match, letter) => letter.toUpperCase());
+    return str.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
   }
     
   getElementSelector(element) {
