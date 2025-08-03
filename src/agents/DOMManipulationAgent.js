@@ -11,6 +11,9 @@ class DOMManipulationAgent extends Agent {
     this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', (params) => this.applyStylesWrapper(params)));
     this.addTool(new Tool('validateStyles', 'Validate CSS properties and values. Call with: {"styles": object_with_css_properties}', (params) => this.validateStylesWrapper(params)));
     this.addTool(new Tool('createElement', 'Create new HTML elements with complete styling. Call with: {"description": "what_to_create", "html": "<div>content</div>", "css": "optional inline CSS", "elementSelectors": ["#id", ".class"]}', (params) => this.createElementWrapper(params)));
+    this.addTool(new Tool('createInteractiveElement', 'Create interactive HTML elements with JavaScript behavior. Call with: {"description": "what_to_create", "html": "<button>Click me</button>", "css": "styling", "javascript": "element.onclick = () => alert(\'test\')", "elementSelectors": ["#id", ".class"]}', (params) => this.createInteractiveElementWrapper(params)));
+    this.addTool(new Tool('addBehavior', 'Add JavaScript behavior to existing elements. Call with: {"description": "what_behavior_to_add", "elementSelectors": ["#id", ".class"], "events": {"click": "alert(\'clicked\')", "mouseenter": "this.style.opacity=0.8"}}', (params) => this.addBehaviorWrapper(params)));
+    this.addTool(new Tool('executeScript', 'Execute custom JavaScript in page context. Call with: {"description": "what_script_does", "code": "console.log(\'hello\')", "context": "global"}', (params) => this.executeScriptWrapper(params)));
     this.addTool(new Tool('deleteElement', 'Delete selected DOM elements. Call with: {"elementSelectors": ["#id", ".class"], "confirmation": true}', (params) => this.deleteElementWrapper(params)));
   }
 
@@ -23,7 +26,10 @@ class DOMManipulationAgent extends Agent {
 
 1. **applyStyles** - MUST use "elementSelectors" (array of CSS selectors)
 2. **createElement** - MUST use "elementSelectors" (array, can be empty)  
-3. **deleteElement** - MUST use "elementSelectors" (array of CSS selectors)
+3. **createInteractiveElement** - MUST use "elementSelectors" (array, can be empty)
+4. **addBehavior** - MUST use "elementSelectors" (array of CSS selectors)
+5. **executeScript** - For global JavaScript execution
+6. **deleteElement** - MUST use "elementSelectors" (array of CSS selectors)
 
 **WRONG:** \`"selectedElements": [objects]\`
 **CORRECT:** \`"elementSelectors": ["#id", ".class"]\`
@@ -45,11 +51,26 @@ class DOMManipulationAgent extends Agent {
 **Action:** Call applyStyles tool to directly apply changes to DOM elements
 
 #### 2. ELEMENT CREATION INTENT  
-**When:** User wants to add new elements to the page
+**When:** User wants to add new static elements to the page
 **Examples:** "adicione um botão", "crie um card similar", "duplique este elemento", "add a button"
 **Action:** Call createElement tool
 
-#### 3. ELEMENT DELETION INTENT
+#### 3. INTERACTIVE ELEMENT CREATION INTENT
+**When:** User wants to create elements with JavaScript behavior
+**Examples:** "crie um botão que mostra alerta", "adicione contador interativo", "botão que muda cor ao clicar", "form com validação"
+**Action:** Call createInteractiveElement tool
+
+#### 4. ADD BEHAVIOR INTENT
+**When:** User wants to add JavaScript behavior to existing elements
+**Examples:** "adicione click handler", "faça este botão mostrar alerta", "quando clicar mude a cor", "adicione hover effect"
+**Action:** Call addBehavior tool
+
+#### 5. SCRIPT EXECUTION INTENT
+**When:** User wants to run custom JavaScript code or create global utilities
+**Examples:** "execute este código", "crie uma função global", "adicione script personalizado", "rode este JavaScript"
+**Action:** Call executeScript tool
+
+#### 6. ELEMENT DELETION INTENT
 **When:** User wants to remove elements from the page  
 **Examples:** "remova este elemento", "delete", "apague isso", "remove this"
 **Action:** Call deleteElement tool
@@ -109,6 +130,48 @@ class DOMManipulationAgent extends Agent {
 - Simple button: \`"html": "<button>Click Me</button>", "css": "background: blue; color: white; padding: 10px;"\`
 - Card component: \`"html": "<div class='card'><h3>Title</h3><p>Content</p></div>", "css": "border: 1px solid #ddd; padding: 20px; border-radius: 8px;"\`
 - Form element: \`"html": "<div><label>Name:</label><input type='text' placeholder='Enter name'></div>", "css": "margin: 10px 0;"\`
+
+### For Interactive Element Creation (createInteractiveElement):
+**CRITICAL:** You must call createInteractiveElement with this EXACT format:
+\`\`\`javascript
+{
+  "description": "Description of interactive element to create",
+  "html": "<button id='my-btn'>Click Me</button>",
+  "css": "padding: 10px 20px; background: blue; color: white; border: none; border-radius: 4px; cursor: pointer;",
+  "javascript": "element.addEventListener('click', () => alert('Hello!'));",
+  "elementSelectors": ["#reference"] // reference elements (can be empty array)
+}
+\`\`\`
+
+**IMPORTANT for createInteractiveElement:**
+- Use "element" to reference the created element in JavaScript
+- JavaScript has access to: element, document, window, console, alert, setTimeout, setInterval
+- For event handlers, use: element.addEventListener('event', callback)
+- For direct assignment, use: element.onclick = callback
+
+### For Adding Behavior (addBehavior):
+**CRITICAL:** You must call addBehavior with this EXACT format:
+\`\`\`javascript
+{
+  "description": "Description of behavior to add",
+  "elementSelectors": ["#button", ".clickable"],
+  "events": {
+    "click": "alert('Clicked!'); console.log('Button clicked');",
+    "mouseenter": "this.style.opacity = '0.8';",
+    "mouseleave": "this.style.opacity = '1';"
+  }
+}
+\`\`\`
+
+### For Script Execution (executeScript):
+**CRITICAL:** You must call executeScript with this EXACT format:
+\`\`\`javascript
+{
+  "description": "Description of what the script does",
+  "code": "console.log('Hello World'); window.myFunction = () => alert('Global function');",
+  "context": "global"
+}
+\`\`\`
 
 ### For Element Deletion (deleteElement):
 **CRITICAL:** You must call deleteElement with this EXACT format:
@@ -258,7 +321,59 @@ createElement({
 })
 \`\`\`
 
-### Example 6: Element Deletion
+### Example 6: Interactive Element Creation
+**User:** "Crie um botão que mostra alerta quando clicado"
+**Your call:**
+\`\`\`javascript
+createInteractiveElement({
+  "description": "Create button with click alert",
+  "html": "<button id='alert-btn' class='interactive-btn'>Clique Aqui!</button>",
+  "css": "padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; transition: background 0.3s;",
+  "javascript": "element.addEventListener('click', () => { alert('Botão clicado!'); console.log('Button clicked at:', new Date()); });",
+  "elementSelectors": []
+})
+\`\`\`
+
+### Example 7: Adding Behavior to Existing Elements
+**User:** "Faça este botão mudar de cor quando passar o mouse"
+**Your call:**
+\`\`\`javascript
+addBehavior({
+  "description": "Add hover color change effect",
+  "elementSelectors": ["#myButton"],
+  "events": {
+    "mouseenter": "this.style.backgroundColor = '#0056b3'; this.style.transform = 'scale(1.05)';",
+    "mouseleave": "this.style.backgroundColor = '#007bff'; this.style.transform = 'scale(1)';",
+    "click": "console.log('Button clicked!'); this.style.boxShadow = '0 4px 8px rgba(0,123,255,0.3)';"
+  }
+})
+\`\`\`
+
+### Example 8: Complex Interactive Form
+**User:** "Crie um formulário de contato com validação"
+**Your call:**
+\`\`\`javascript
+createInteractiveElement({
+  "description": "Create contact form with validation",
+  "html": "<form id='contact-form' class='contact-form'><h3>Contato</h3><div><label>Nome:</label><input type='text' id='name' required></div><div><label>Email:</label><input type='email' id='email' required></div><div><label>Mensagem:</label><textarea id='message' required></textarea></div><button type='submit'>Enviar</button></form>",
+  "css": "padding: 20px; border: 1px solid #ddd; border-radius: 12px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; font-family: Arial, sans-serif;",
+  "javascript": "element.addEventListener('submit', (e) => { e.preventDefault(); const name = element.querySelector('#name').value; const email = element.querySelector('#email').value; const message = element.querySelector('#message').value; if(name && email && message) { alert('Formulário enviado com sucesso!'); console.log('Form data:', {name, email, message}); element.reset(); } else { alert('Por favor, preencha todos os campos!'); } });",
+  "elementSelectors": []
+})
+\`\`\`
+
+### Example 9: Global Script Execution
+**User:** "Crie uma função global que conta cliques na página"
+**Your call:**
+\`\`\`javascript
+executeScript({
+  "description": "Create global click counter function",
+  "code": "window.clickCounter = 0; window.trackClicks = function() { window.clickCounter++; console.log('Total clicks:', window.clickCounter); }; document.addEventListener('click', window.trackClicks); console.log('Click counter initialized');",
+  "context": "global"
+})
+\`\`\`
+
+### Example 10: Element Deletion
 **User:** "Remova este elemento"
 **Your call:**
 \`\`\`javascript
@@ -266,6 +381,37 @@ deleteElement({
   "elementSelectors": ["#elementToDelete"],
   "confirmation": true
 })
+\`\`\`
+
+## INTERACTIVE ELEMENT BEST PRACTICES
+
+### JavaScript Safety and Power
+- Use the "element" reference to access the created element directly
+- Access common globals: console, alert, prompt, confirm, setTimeout, setInterval
+- Use helper functions: $() for querySelector, $$() for querySelectorAll
+- Event handlers are automatically wrapped in try-catch for safety
+- Elements can interact with each other using selectors
+
+### Event Handler Examples
+**Click Events:**
+\`\`\`javascript
+"click": "alert('Clicked!'); this.textContent = 'Clicked ' + (this.clickCount = (this.clickCount || 0) + 1) + ' times';"
+\`\`\`
+
+**Form Validation:**
+\`\`\`javascript
+"submit": "event.preventDefault(); const input = this.querySelector('input'); if(!input.value) { alert('Required!'); return; } alert('Valid!');"
+\`\`\`
+
+**Animation Effects:**
+\`\`\`javascript
+"mouseenter": "this.style.transform = 'scale(1.1)'; this.style.transition = 'transform 0.3s';",
+"mouseleave": "this.style.transform = 'scale(1)';"
+\`\`\`
+
+**Data Storage:**
+\`\`\`javascript
+"click": "const count = parseInt(localStorage.getItem('buttonClicks') || '0') + 1; localStorage.setItem('buttonClicks', count); this.textContent = 'Clicked ' + count + ' times';"
 \`\`\`
 
 ## ERROR PREVENTION
@@ -712,6 +858,236 @@ Current Styling:`;
     return element;
   }
 
+  async createInteractiveElement(params) {
+    const { description, html, css, javascript, elementSelectors = [] } = params;
+    
+    if (!description) {
+      return 'Descrição é obrigatória para criar elemento interativo.';
+    }
+    
+    if (!html || !html.trim()) {
+      return 'HTML é obrigatório para criar elemento interativo.';
+    }
+    
+    let newElement = null;
+    
+    try {
+      // Create element from HTML and CSS
+      newElement = this.createElementFromHTML(html, css);
+      
+      // Add JavaScript behavior if provided
+      if (javascript && javascript.trim()) {
+        this.addJavaScriptBehavior(newElement, javascript);
+      }
+      
+      // Insert into DOM
+      const insertionPoint = this.findInsertionPoint(elementSelectors);
+      insertionPoint.appendChild(newElement);
+      
+      // Add visual indicator for new element
+      this.addNewElementIndicator(newElement);
+      
+      // Track in history
+      await this.applier.applyLLMResponse({
+        action: 'create_interactive_element',
+        explanation: `Elemento interativo criado: ${description}`,
+        styles: {},
+        html: newElement.outerHTML,
+        javascript: javascript || ''
+      }, newElement, `createInteractiveElement: ${description}`);
+      
+      return `✅ Elemento interativo criado: ${description}. Comportamento JavaScript adicionado.`;
+      
+    } catch (error) {
+      console.error('Error creating interactive element:', error);
+      return `Erro ao criar elemento interativo: ${error.message}`;
+    }
+  }
+
+  addJavaScriptBehavior(element, code) {
+    try {
+      // Create safe execution context with commonly used globals
+      const safeGlobals = {
+        element: element,
+        console: window.console,
+        alert: window.alert,
+        prompt: window.prompt,
+        confirm: window.confirm,
+        setTimeout: window.setTimeout,
+        setInterval: window.setInterval,
+        clearTimeout: window.clearTimeout,
+        clearInterval: window.clearInterval,
+        document: document,
+        window: window,
+        // Helper functions
+        $: (selector) => document.querySelector(selector),
+        $$: (selector) => document.querySelectorAll(selector)
+      };
+      
+      // Execute JavaScript with element context and safe globals
+      const func = new Function(
+        'element', 'console', 'alert', 'prompt', 'confirm', 
+        'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 
+        'document', 'window', '$', '$$',
+        code
+      );
+      
+      func.call(element, ...Object.values(safeGlobals));
+      
+      console.log('✅ JavaScript behavior added successfully to element:', element);
+      
+    } catch (error) {
+      console.error('❌ JavaScript execution error:', error);
+      throw new Error(`JavaScript error: ${error.message}`);
+    }
+  }
+
+  async addBehavior(params) {
+    const { description, elementSelectors = [], events = {} } = params;
+    
+    if (!description) {
+      return 'Descrição é obrigatória para adicionar comportamento.';
+    }
+    
+    if (!elementSelectors || elementSelectors.length === 0) {
+      return 'elementSelectors é obrigatório para adicionar comportamento a elementos existentes.';
+    }
+    
+    if (!events || Object.keys(events).length === 0) {
+      return 'Events object é obrigatório para definir comportamentos.';
+    }
+    
+    try {
+      // Reconstruct elements from selectors
+      const elements = this.reconstructElementsFromSelectors(elementSelectors);
+      
+      if (elements.length === 0) {
+        return `Nenhum elemento encontrado com os seletores fornecidos: ${elementSelectors.join(', ')}.`;
+      }
+      
+      let successCount = 0;
+      const results = [];
+      
+      // Add behavior to each element
+      elements.forEach((element, index) => {
+        try {
+          // Add each event handler
+          Object.entries(events).forEach(([eventType, handlerCode]) => {
+            const wrappedCode = `
+              const handler = function(event) {
+                try {
+                  ${handlerCode}
+                } catch (error) {
+                  console.error('Event handler error:', error);
+                }
+              };
+              element.addEventListener('${eventType}', handler);
+            `;
+            
+            this.addJavaScriptBehavior(element, wrappedCode);
+          });
+          
+          successCount++;
+          results.push({
+            element: this.getElementInfo(element),
+            success: true,
+            events: Object.keys(events)
+          });
+          
+        } catch (error) {
+          results.push({
+            element: this.getElementInfo(element),
+            success: false,
+            error: error.message
+          });
+        }
+      });
+      
+      // Track in history
+      if (successCount > 0) {
+        await this.applier.applyLLMResponse({
+          action: 'add_behavior',
+          explanation: `Comportamento adicionado: ${description}`,
+          styles: {},
+          eventTypes: Object.keys(events),
+          elementCount: successCount
+        }, elements[0], `addBehavior: ${description}`);
+      }
+      
+      const message = successCount === elements.length 
+        ? `✅ Comportamento adicionado: ${description}. ${successCount} elemento(s) atualizados com eventos: ${Object.keys(events).join(', ')}.`
+        : `⚠️ Comportamento parcialmente adicionado: ${successCount}/${elements.length} elemento(s) atualizados.`;
+      
+      return message;
+      
+    } catch (error) {
+      console.error('Error adding behavior:', error);
+      return `Erro ao adicionar comportamento: ${error.message}`;
+    }
+  }
+
+  async executeScript(params) {
+    const { description, code, context = 'global' } = params;
+    
+    if (!description) {
+      return 'Descrição é obrigatória para executar script.';
+    }
+    
+    if (!code || !code.trim()) {
+      return 'Código JavaScript é obrigatório para executar script.';
+    }
+    
+    try {
+      let result;
+      
+      if (context === 'global') {
+        // Execute in global context with access to document and window
+        const func = new Function(
+          'document', 'window', 'console', 'alert', 'prompt', 'confirm',
+          'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+          '$', '$$',
+          code
+        );
+        
+        result = func(
+          document, window, window.console, window.alert, 
+          window.prompt, window.confirm, window.setTimeout, 
+          window.setInterval, window.clearTimeout, window.clearInterval,
+          (selector) => document.querySelector(selector),
+          (selector) => document.querySelectorAll(selector)
+        );
+      } else {
+        // Execute in restricted context
+        const func = new Function(
+          'console', '$', '$$',
+          code
+        );
+        
+        result = func(
+          window.console,
+          (selector) => document.querySelector(selector),
+          (selector) => document.querySelectorAll(selector)
+        );
+      }
+      
+      // Track in history
+      await this.applier.applyLLMResponse({
+        action: 'execute_script',
+        explanation: `Script executado: ${description}`,
+        styles: {},
+        code: code,
+        context: context
+      }, document.body, `executeScript: ${description}`);
+      
+      const resultInfo = result !== undefined ? ` Resultado: ${result}` : '';
+      return `✅ Script executado: ${description}.${resultInfo}`;
+      
+    } catch (error) {
+      console.error('Script execution error:', error);
+      return `Erro ao executar script: ${error.message}`;
+    }
+  }
+
   createBasicElement(description) {
     const lowerDesc = description.toLowerCase();
     let element;
@@ -891,14 +1267,29 @@ Current Styling:`;
     return elements.map(element => this.getElementSelector(element)).filter(Boolean);
   }
 
-  findInsertionPoint(selectedElements) {
-    if (selectedElements && selectedElements.length > 0) {
-      const lastSelected = selectedElements[selectedElements.length - 1];
+  findInsertionPoint(elementSelectors) {
+    // Handle both element selectors and actual elements
+    let elements = [];
+    
+    if (Array.isArray(elementSelectors)) {
+      if (elementSelectors.length > 0) {
+        // Check if it's an array of selectors (strings) or elements
+        if (typeof elementSelectors[0] === 'string') {
+          elements = this.reconstructElementsFromSelectors(elementSelectors);
+        } else if (elementSelectors[0] && elementSelectors[0].nodeType) {
+          elements = elementSelectors;
+        }
+      }
+    }
+    
+    if (elements.length > 0) {
+      const lastSelected = elements[elements.length - 1];
       const parent = lastSelected.parentNode;
       if (parent) {
         return parent;
       }
     }
+    
     return document.body;
   }
 
@@ -1116,6 +1507,103 @@ Current Styling:`;
     return this.deleteElement({
       selectedElements: selectedElements,
       confirmation: confirmation
+    });
+  }
+
+  async createInteractiveElementWrapper(params) {
+    console.log('createInteractiveElementWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Description and html parameters are required');
+    }
+    
+    let elementSelectors = [];
+    
+    // Handle elementSelectors
+    if (params.elementSelectors) {
+      elementSelectors = params.elementSelectors;
+    }
+    // Handle case where selectors come from currentElementSelectors
+    else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
+      elementSelectors = this.currentElementSelectors;
+    }
+    
+    // Validate required parameters
+    if (!params.description) {
+      throw new Error('Description parameter is required');
+    }
+    
+    if (!params.html || !params.html.trim()) {
+      throw new Error('HTML parameter is required for interactive elements');
+    }
+    
+    return this.createInteractiveElement({
+      description: params.description,
+      html: params.html,
+      css: params.css || null,
+      javascript: params.javascript || null,
+      elementSelectors: elementSelectors
+    });
+  }
+
+  async addBehaviorWrapper(params) {
+    console.log('addBehaviorWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Description, elementSelectors, and events parameters are required');
+    }
+    
+    let elementSelectors = [];
+    
+    // Handle new elementSelectors format
+    if (params.elementSelectors) {
+      elementSelectors = params.elementSelectors;
+    }
+    // Handle case where selectors come from currentElementSelectors
+    else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
+      elementSelectors = this.currentElementSelectors;
+    }
+    
+    // Validate required parameters
+    if (!params.description) {
+      throw new Error('Description parameter is required');
+    }
+    
+    if (!elementSelectors || elementSelectors.length === 0) {
+      throw new Error('elementSelectors parameter is required');
+    }
+    
+    if (!params.events || Object.keys(params.events).length === 0) {
+      throw new Error('Events parameter is required');
+    }
+    
+    return this.addBehavior({
+      description: params.description,
+      elementSelectors: elementSelectors,
+      events: params.events
+    });
+  }
+
+  async executeScriptWrapper(params) {
+    console.log('executeScriptWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Description and code parameters are required');
+    }
+    
+    // Validate required parameters
+    if (!params.description) {
+      throw new Error('Description parameter is required');
+    }
+    
+    if (!params.code || !params.code.trim()) {
+      throw new Error('Code parameter is required');
+    }
+    
+    return this.executeScript({
+      description: params.description,
+      code: params.code,
+      context: params.context || 'global'
     });
   }
 }

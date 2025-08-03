@@ -1,3 +1,6 @@
+// Global event handler that all ElementSelector instances will use
+window.DSA_GLOBAL_HANDLER = null;
+
 class ElementSelector {
   constructor() {
     this.isEnabled = false;
@@ -9,8 +12,37 @@ class ElementSelector {
     this.multiOverlays = [];
     this.onSelectionChange = null;
     this.lastSelectedElements = []; // Track last selected elements for reuse
+    this.instanceId = Math.random().toString(36).substring(2, 11); // Unique instance ID
     
     this.createOverlay();
+    this.setupGlobalHandler();
+  }
+  
+  setupGlobalHandler() {
+    // Create a single global handler that routes to the active instance
+    if (!window.DSA_GLOBAL_HANDLER) {
+      window.DSA_GLOBAL_HANDLER = {
+        activeInstance: null,
+        
+        handleGlobalMouseOver: (e) => {
+          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
+            window.DSA_GLOBAL_HANDLER.activeInstance.handleMouseOver(e);
+          }
+        },
+        
+        handleGlobalMouseOut: (e) => {
+          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
+            window.DSA_GLOBAL_HANDLER.activeInstance.handleMouseOut(e);
+          }
+        },
+        
+        handleGlobalClick: (e) => {
+          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
+            window.DSA_GLOBAL_HANDLER.activeInstance.handleClick(e);
+          }
+        }
+      };
+    }
   }
   
   createOverlay() {
@@ -24,45 +56,108 @@ class ElementSelector {
   }
   
   enable() {
-    if (this.isEnabled) return;
+    if (this.isEnabled) {
+      console.warn('⚠️ ElementSelector: Already enabled, skipping...');
+      return;
+    }
+    
+    // First, ensure any previous global listeners are removed
+    this.removeGlobalListeners();
     
     this.isEnabled = true;
     this.multipleSelectionEnabled = true; // Always enable multiple selection
-    document.addEventListener('mouseover', this.handleMouseOver);
-    document.addEventListener('mouseout', this.handleMouseOut);
-    document.addEventListener('click', this.handleClick);
+    
+    // Set this instance as the active one
+    window.DSA_GLOBAL_HANDLER.activeInstance = this;
+    
+    console.log(`🔧 ElementSelector [${this.instanceId}]: Adding global event listeners...`);
+    
+    // Add the global handlers to document
+    document.addEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
+    document.addEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
+    document.addEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick);
+    
+    console.log(`✅ ElementSelector [${this.instanceId}]: Enabled successfully as active instance`);
   }
   
   disable() {
     this.isEnabled = false;
     this.clearSelection();
     this.clearMultiSelection();
-    document.removeEventListener('mouseover', this.handleMouseOver);
-    document.removeEventListener('mouseout', this.handleMouseOut);
-    document.removeEventListener('click', this.handleClick);
+    
+    console.log(`🔧 ElementSelector [${this.instanceId}]: Disabling...`);
+    
+    // Remove this instance as active
+    if (window.DSA_GLOBAL_HANDLER.activeInstance === this) {
+      window.DSA_GLOBAL_HANDLER.activeInstance = null;
+      console.log(`🎯 ElementSelector [${this.instanceId}]: Deactivated as active instance`);
+    }
+    
+    // Remove global listeners
+    this.removeGlobalListeners();
+    
+    // Hide any remaining overlays
+    this.hideOverlay();
+    this.forceRemoveAllSelectionOverlays();
+    
+    console.log(`✅ ElementSelector [${this.instanceId}]: Disabled successfully`);
   }
   
-  handleMouseOver = (e) => {
-    if (!this.isEnabled) return;
+  removeGlobalListeners() {
+    console.log('🧹 ElementSelector: Removing global event listeners...');
+    
+    // Remove the global handlers
+    document.removeEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
+    document.removeEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
+    document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick);
+    
+    // Also try with capture flag
+    document.removeEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver, true);
+    document.removeEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut, true);
+    document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick, true);
+    
+    console.log('🧹 ElementSelector: Global listeners removed');
+  }
+  
+  handleMouseOver(e) {
+    if (!this.isEnabled) {
+      console.warn('⚠️ ElementSelector: MouseOver called but selector is disabled!');
+      return;
+    }
     if (e.target.closest('.dsa-chat-panel')) return;
     if (this.selectedElement) return; // Stop hovering after selection
     
     this.hoveredElement = e.target;
     this.showOverlay(e.target);
-  };
+  }
   
-  handleMouseOut = (e) => {
-    if (!this.isEnabled) return;
+  handleMouseOut(e) {
+    if (!this.isEnabled) {
+      console.warn('⚠️ ElementSelector: MouseOut called but selector is disabled!');
+      return;
+    }
     if (e.target.closest('.dsa-chat-panel')) return;
     if (this.selectedElement) return; // Keep overlay visible after selection
     
     this.hoveredElement = null;
     this.hideOverlay();
-  };
+  }
   
-  handleClick = (e) => {
-    if (!this.isEnabled) return;
+  handleClick(e) {
+    // Extra safety: check if this is the active instance
+    if (window.DSA_GLOBAL_HANDLER.activeInstance !== this) {
+      console.warn(`⚠️ ElementSelector [${this.instanceId}]: Click called but not active instance!`);
+      return;
+    }
+    
+    if (!this.isEnabled) {
+      console.warn(`⚠️ ElementSelector [${this.instanceId}]: Click called but selector is disabled!`);
+      return;
+    }
+    
     if (e.target.closest('.dsa-chat-panel')) return;
+    
+    console.log(`🖱️ ElementSelector [${this.instanceId}]: Processing click on`, e.target.tagName);
     
     e.preventDefault();
     e.stopPropagation();
@@ -78,7 +173,7 @@ class ElementSelector {
       // Original single selection mode
       this.selectElement(e.target);
     }
-  };
+  }
   
   showOverlay(element) {
     const rect = element.getBoundingClientRect();
