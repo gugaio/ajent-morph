@@ -16,6 +16,7 @@ class DOMManipulationAgent extends Agent {
     this.addTool(new Tool('executeScript', 'Execute custom JavaScript in page context. Call with: {"description": "what_script_does", "code": "console.log(\'hello\')", "context": "global"}', (params) => this.executeScriptWrapper(params)));
     this.addTool(new Tool('deleteElement', 'Delete selected DOM elements. Call with: {"elementSelectors": ["#id", ".class"], "confirmation": true}', (params) => this.deleteElementWrapper(params)));
     this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
+    this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', (params) => this.generateImageWrapper(params)));
   }
 
   instruction = () => {
@@ -31,6 +32,7 @@ class DOMManipulationAgent extends Agent {
 4. **addBehavior** - MUST use "elementSelectors" (array of CSS selectors)
 5. **executeScript** - For global JavaScript execution
 6. **deleteElement** - MUST use "elementSelectors" (array of CSS selectors)
+7. **generateImage** - MUST use "elementSelectors" (array, can be empty) for applying images
 
 **WRONG:** \`"selectedElements": [objects]\`
 **CORRECT:** \`"elementSelectors": ["#id", ".class"]\`
@@ -76,7 +78,12 @@ class DOMManipulationAgent extends Agent {
 **Examples:** "remova este elemento", "delete", "apague isso", "remove this"
 **Action:** Call deleteElement tool
 
-#### 7. CLAUDE CODE INSTRUCTIONS INTENT
+#### 7. IMAGE GENERATION INTENT
+**When:** User wants to generate images and apply them to elements or create new image elements
+**Examples:** "adicione uma imagem de", "crie uma imagem de", "gere uma imagem", "coloque uma foto de", "background com imagem de", "fundo com", "generate image"
+**Action:** Call generateImage tool
+
+#### 8. CLAUDE CODE INSTRUCTIONS INTENT
 **When:** User wants to generate instructions for Claude Code IDE to implement changes
 **Examples:** "Gerar instruções Claude Code", "Instruções para IDE", "Claude Code instructions", "generate IDE instructions"
 **Action:** Call generateClaudeCodeInstructions tool, then parse and analyze the returned JSON data
@@ -188,6 +195,30 @@ class DOMManipulationAgent extends Agent {
   "confirmation": true // required for safety
 }
 \`\`\`
+
+### For Image Generation (generateImage):
+**CRITICAL:** You must call generateImage with this EXACT format:
+\`\`\`javascript
+{
+  "description": "Description of what image to generate",
+  "prompt": "Detailed prompt for image generation (e.g., 'a futuristic city with floating buildings')",
+  "elementSelectors": ["#id", ".class"], // CSS selectors for target elements (can be empty array)
+  "applyAs": "background" // or "element" - how to apply the image
+}
+\`\`\`
+
+**IMPORTANT for generateImage:**
+- **description**: Clear description of what you're creating/applying
+- **prompt**: Detailed description for DALL-E image generation in English or Portuguese
+- **elementSelectors**: Array of CSS selectors where to apply image (empty array creates new img element)
+- **applyAs**: "background" applies as background-image to selected elements, "element" creates new img tag
+- The tool will automatically handle API calls, image URL extraction, and DOM manipulation
+- Generated images are tracked in history for undo functionality
+
+**generateImage Examples:**
+- Background for element: \`{"description": "Apply mountain landscape background", "prompt": "beautiful mountain landscape at sunrise", "elementSelectors": ["#hero"], "applyAs": "background"}\`
+- New image element: \`{"description": "Create cat image", "prompt": "cute orange tabby cat sitting in sunlight", "elementSelectors": [], "applyAs": "element"}\`
+- Multiple elements: \`{"description": "Apply space background", "prompt": "deep space with stars and galaxies", "elementSelectors": [".card", ".hero"], "applyAs": "background"}\`
 
 ### For Claude Code Instructions (generateClaudeCodeInstructions):
 **CRITICAL:** You must call generateClaudeCodeInstructions with NO parameters:
@@ -403,7 +434,30 @@ deleteElement({
 })
 \`\`\`
 
-### Example 11: Claude Code Instructions Generation
+### Example 11: Image Generation
+**User:** "Adicione uma imagem de uma paisagem de montanha como fundo"
+**Your call:**
+\`\`\`javascript
+generateImage({
+  "description": "Apply mountain landscape background to selected element",
+  "prompt": "beautiful mountain landscape with snow-capped peaks at sunrise, dramatic clouds, serene lake reflection",
+  "elementSelectors": ["#hero"],
+  "applyAs": "background"
+})
+\`\`\`
+
+**User:** "Crie uma imagem de um gato fofo"
+**Your call:**
+\`\`\`javascript
+generateImage({
+  "description": "Create cute cat image element",
+  "prompt": "adorable fluffy orange tabby cat sitting in warm sunlight, big green eyes, soft fur texture",
+  "elementSelectors": [],
+  "applyAs": "element"
+})
+\`\`\`
+
+### Example 12: Claude Code Instructions Generation
 **User:** "Gerar instruções Claude Code"
 **Your call:**
 \`\`\`javascript
@@ -474,9 +528,9 @@ Consider accessibility in your style suggestions:
 **CRITICAL:** After completing any DOM manipulation task (applyStyles, createElement, or deleteElement), you MUST use the "final_answer" tool to indicate that you have completed your task or reasoning and are returning a final response to the user.
 
 ### Workflow Pattern:
-1. 🎯 **Identify Intent**: Analyze user command (modify, create, delete, or Claude Code instructions)
-2. 🔧 **Execute Tool**: Call appropriate tool (applyStyles, createElement, deleteElement, generateClaudeCodeInstructions)
-3. 📊 **Process Results**: For Claude Code instructions, analyze the returned changeHistory object
+1. 🎯 **Identify Intent**: Analyze user command (modify, create, delete, generate image, or Claude Code instructions)
+2. 🔧 **Execute Tool**: Call appropriate tool (applyStyles, createElement, deleteElement, generateImage, generateClaudeCodeInstructions)
+3. 📊 **Process Results**: For Claude Code instructions, analyze the returned changeHistory object; for images, confirm generation and application
 4. ✅ **Provide Final Answer**: Use final_answer tool with formatted instructions or summary
 
 ### Example Final Answer Usage:
@@ -793,6 +847,7 @@ Current Styling:`;
       'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
       'color', 'backgroundColor', 'border', 'borderTop', 'borderRight', 'borderBottom', 'borderLeft',
       'borderColor', 'borderWidth', 'borderStyle', 'borderRadius',
+      'background', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat', 'backgroundAttachment',
       'boxShadow', 'textShadow', 'textAlign', 'textDecoration', 'textTransform',
       'flexDirection', 'justifyContent', 'alignItems', 'alignSelf', 'flex', 'flexGrow', 'flexShrink',
       'gridTemplateColumns', 'gridTemplateRows', 'gridGap', 'gap',
@@ -1715,6 +1770,172 @@ Current Styling:`;
     }
     
     return this.generateClaudeCodeInstructions(actualParams);
+  }
+
+  async generateImage(params) {
+    const { description, prompt, elementSelectors = [], applyAs = 'background' } = params;
+    
+    if (!description) {
+      return 'Descrição é obrigatória para gerar imagem.';
+    }
+    
+    if (!prompt || !prompt.trim()) {
+      return 'Prompt é obrigatório para gerar imagem.';
+    }
+    
+    try {
+      // Call OpenAI API to generate image
+      console.log('🎨 Generating image with prompt:', prompt);
+      
+      const response = await fetch('https://spinal.onrender.com/text-to-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Token': 'faab7706-adec-498e-bf2a-6da0ffe8ae82'
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          model: 'dall-e-3',
+          size: '1024x1024',
+          quality: 'standard',
+          n: 1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Image generated successfully:', result);
+      
+      // Extract image URL from response
+      let imageUrl;
+      if (result.images && result.images.length > 0) {
+        // Handle the actual API response format: {images: ['url1', 'url2']}
+        imageUrl = result.images[0];
+      } else if (result.data && result.data.length > 0 && result.data[0].url) {
+        // Handle OpenAI standard format (fallback)
+        imageUrl = result.data[0].url;
+      } else if (result.url) {
+        // Handle direct URL format (fallback)
+        imageUrl = result.url;
+      } else {
+        console.error('Unexpected API response format:', result);
+        throw new Error('No image URL found in API response');
+      }
+
+      console.log('🖼️ Image URL:', imageUrl);
+
+      // Apply the image based on the applyAs parameter
+      if (applyAs === 'background' && elementSelectors.length > 0) {
+        // Apply as background image to selected elements
+        const elements = this.reconstructElementsFromSelectors(elementSelectors);
+        
+        if (elements.length === 0) {
+          return `❌ Nenhum elemento encontrado com os seletores fornecidos: ${elementSelectors.join(', ')}.`;
+        }
+
+        let successCount = 0;
+        for (const element of elements) {
+          try {
+            // Apply background image
+            await this.applier.applyLLMResponse({
+              action: 'apply_background_image',
+              explanation: `Imagem de fundo aplicada: ${description}`,
+              styles: {
+                backgroundImage: `url(${imageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }
+            }, element, `generateImage: ${description}`);
+            
+            successCount++;
+          } catch (error) {
+            console.error('Error applying background image:', error);
+          }
+        }
+
+        return `✅ Imagem gerada e aplicada como fundo: ${description}. Background aplicado em ${successCount} elemento(s). URL: ${imageUrl}`;
+        
+      } else {
+        // Create new img element
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.alt = description;
+        imgElement.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px;';
+        
+        // Insert into DOM
+        const insertionPoint = this.findInsertionPoint(elementSelectors);
+        insertionPoint.appendChild(imgElement);
+        
+        // Add visual indicator for new element
+        this.addNewElementIndicator(imgElement);
+        
+        // Track in history
+        await this.applier.applyLLMResponse({
+          action: 'create_image_element',
+          explanation: `Elemento de imagem criado: ${description}`,
+          styles: {},
+          html: imgElement.outerHTML,
+          imageUrl: imageUrl
+        }, imgElement, `generateImage: ${description}`);
+        
+        return `✅ Imagem gerada e elemento criado: ${description}. Nova imagem adicionada à página. URL: ${imageUrl}`;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error generating image:', error);
+      return `Erro ao gerar imagem: ${error.message}`;
+    }
+  }
+
+  async generateImageWrapper(params) {
+    console.log('generateImageWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Description and prompt parameters are required');
+    }
+    
+    // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
+    let actualParams = params;
+    if (params.params && typeof params.params === 'string') {
+      try {
+        actualParams = JSON.parse(params.params);
+        console.log('Parsed actualParams for generateImage:', actualParams);
+      } catch (error) {
+        console.warn('Failed to parse params.params:', error);
+        actualParams = params;
+      }
+    }
+    
+    let elementSelectors = [];
+    
+    // Handle elementSelectors
+    if (actualParams.elementSelectors) {
+      elementSelectors = actualParams.elementSelectors;
+    }
+    // Handle case where selectors come from currentElementSelectors
+    else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
+      elementSelectors = this.currentElementSelectors;
+    }
+    
+    // Validate required parameters
+    if (!actualParams.description) {
+      throw new Error('Description parameter is required');
+    }
+    
+    if (!actualParams.prompt || !actualParams.prompt.trim()) {
+      throw new Error('Prompt parameter is required for image generation');
+    }
+    
+    return this.generateImage({
+      description: actualParams.description,
+      prompt: actualParams.prompt,
+      elementSelectors: elementSelectors,
+      applyAs: actualParams.applyAs || 'background'
+    });
   }
 }
 
