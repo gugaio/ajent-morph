@@ -10,8 +10,8 @@ class DOMManipulationAgent extends Agent {
 
     this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', (params) => this.applyStylesWrapper(params)));
     this.addTool(new Tool('validateStyles', 'Validate CSS properties and values. Call with: {"styles": object_with_css_properties}', (params) => this.validateStylesWrapper(params)));
-    this.addTool(new Tool('createElement', 'Create new HTML elements with complete styling. Call with: {"description": "what_to_create", "html": "<div>content</div>", "css": "optional inline CSS", "elementSelectors": ["#id", ".class"]}', (params) => this.createElementWrapper(params)));
-    this.addTool(new Tool('createInteractiveElement', 'Create interactive HTML elements with JavaScript behavior. Call with: {"description": "what_to_create", "html": "<button>Click me</button>", "css": "styling", "javascript": "element.onclick = () => alert(\'test\')", "elementSelectors": ["#id", ".class"]}', (params) => this.createInteractiveElementWrapper(params)));
+    this.addTool(new Tool('createElement', 'Create new HTML elements with complete styling. Call with: {"description": "what_to_create", "html": "<div>content</div>", "css": "optional inline CSS", "elementSelectors": ["#id", ".class"], "insertionMode": "append|replace|after|before"}', (params) => this.createElementWrapper(params)));
+    this.addTool(new Tool('createInteractiveElement', 'Create interactive HTML elements with JavaScript behavior. Call with: {"description": "what_to_create", "html": "<button>Click me</button>", "css": "styling", "javascript": "element.onclick = () => alert(\'test\')", "elementSelectors": ["#id", ".class"], "insertionMode": "append|replace|after|before"}', (params) => this.createInteractiveElementWrapper(params)));
     this.addTool(new Tool('addBehavior', 'Add JavaScript behavior to existing elements. Call with: {"description": "what_behavior_to_add", "elementSelectors": ["#id", ".class"], "events": {"click": "alert(\'clicked\')", "mouseenter": "this.style.opacity=0.8"}}', (params) => this.addBehaviorWrapper(params)));
     this.addTool(new Tool('executeScript', 'Execute custom JavaScript in page context. Call with: {"description": "what_script_does", "code": "console.log(\'hello\')", "context": "global"}', (params) => this.executeScriptWrapper(params)));
     this.addTool(new Tool('deleteElement', 'Delete selected DOM elements. Call with: {"elementSelectors": ["#id", ".class"], "confirmation": true}', (params) => this.deleteElementWrapper(params)));
@@ -40,6 +40,15 @@ class DOMManipulationAgent extends Agent {
 ## INTENT IDENTIFICATION AND ACTION DECISION
 
 **CRITICAL:** Distinguish between ACTION requests and INFORMATION requests:
+
+### 🔄 REPLACEMENT STRATEGY (VERY IMPORTANT)
+**For replacement commands like "trocar logo por menu", "substituir botão", "mudar para":**
+1. **NEVER** call deleteElement first  
+2. **ALWAYS** use createElement with insertionMode: "replace"
+3. This ensures atomic replacement without losing the target position
+
+**Wrong approach:** deleteElement + createElement → element ends up at bottom of page
+**Correct approach:** createElement with insertionMode: "replace" → element replaces original position
 
 ### 🔍 INFORMATION REQUESTS (NO TOOLS NEEDED)
 **When:** User wants to know about current element properties/styles
@@ -75,8 +84,10 @@ class DOMManipulationAgent extends Agent {
 
 #### 6. ELEMENT DELETION INTENT
 **When:** User wants to remove elements from the page  
-**Examples:** "remova este elemento", "delete", "apague isso", "remove this"
+**Examples:** "remova este elemento", "delete", "apague isso", "remove this"  
 **Action:** Call deleteElement tool
+
+**CRITICAL:** For replacement operations ("trocar", "substituir", "mudar para"), DO NOT use deleteElement + createElement. Instead, use createElement with insertionMode: "replace" directly.
 
 #### 7. IMAGE GENERATION INTENT
 **When:** User wants to generate images and apply them to elements or create new image elements
@@ -128,7 +139,8 @@ class DOMManipulationAgent extends Agent {
   "description": "Description of what element to create",
   "html": "<div class='my-component'>Complete HTML content here</div>",
   "css": "optional inline CSS string for styling",
-  "elementSelectors": ["#id", ".class"] // reference elements (can be empty array)
+  "elementSelectors": ["#id", ".class"], // reference elements (can be empty array)
+  "insertionMode": "replace" // IMPORTANT: choose insertion strategy (replace|append|after|before)
 }
 \`\`\`
 
@@ -139,6 +151,21 @@ class DOMManipulationAgent extends Agent {
 - Make HTML semantic and accessible
 - For complex components, include all inner elements in the HTML
 - CSS should be inline styles for immediate application
+
+**INSERTION MODE USAGE:**
+- Use **"replace"** when user wants to substitute/change an existing element (e.g., "trocar logo por menu")
+- Use **"append"** for adding new content inside existing elements
+- Use **"after"** to insert next to selected element (same parent level)
+- Use **"before"** to insert before selected element (same parent level)
+
+**REPLACEMENT EXAMPLES:**
+✅ **Correct:** User says "trocar logo por ícone de menu"
+- Call createElement with insertionMode: "replace" and elementSelectors pointing to the logo
+- This will replace the logo in its exact position
+
+❌ **Wrong:** deleteElement + createElement (causes element to appear at bottom)
+- Never delete first and then create - this loses the target position
+- Element will end up at the bottom of the page
 
 **createElement Examples:**
 - Simple button: \`"html": "<button>Click Me</button>", "css": "background: blue; color: white; padding: 10px;"\`
@@ -153,7 +180,8 @@ class DOMManipulationAgent extends Agent {
   "html": "<button id='my-btn'>Click Me</button>",
   "css": "padding: 10px 20px; background: blue; color: white; border: none; border-radius: 4px; cursor: pointer;",
   "javascript": "element.addEventListener('click', () => alert('Hello!'));",
-  "elementSelectors": ["#reference"] // reference elements (can be empty array)
+  "elementSelectors": ["#reference"], // reference elements (can be empty array)
+  "insertionMode": "replace" // IMPORTANT: choose insertion strategy (replace|append|after|before)
 }
 \`\`\`
 
@@ -228,10 +256,15 @@ generateClaudeCodeInstructions()
 
 **IMPORTANT for generateClaudeCodeInstructions:**
 - This tool does NOT require any parameters or selected elements
-- It returns a JSON string containing: {changeHistory: [], totalChanges: number, message: string}
+- It returns a JSON string containing: {changeHistory: [], totalChanges: number, imageDownloads: [], message: string}
 - You MUST parse the JSON, analyze the changeHistory array, and create detailed Claude Code instructions
 - Each change has: timestamp, element, command, response, previousState, appliedChanges, elementContext
 - Use elementContext.uniqueSelector for specific CSS targeting instead of generic selectors
+- **IMAGE DOWNLOADS**: If imageDownloads array exists, you MUST include download and file organization instructions:
+  - Create \`"src/assets/images/"\` directory if it doesn't exist
+  - Download each image from originalUrl and save as filename
+  - Update CSS references to use localPath instead of temporary URLs
+  - Provide specific curl or fetch commands for downloading images
 
 
 ## CSS GENERATION GUIDELINES
@@ -465,15 +498,28 @@ generateClaudeCodeInstructions()
 \`\`\`
 
 **Your follow-up:** 
-1. The tool returns a JSON string - parse it to get the changeHistory array
+1. The tool returns a JSON string - parse it to get the changeHistory and imageDownloads arrays
 2. Analyze each change in the array (CSS modifications, elements created, etc.)
 3. For each change, use elementContext.uniqueSelector for specific targeting
-4. Create comprehensive, actionable instructions for Claude Code IDE with precise selectors
-5. Use final_answer with the formatted instructions as a string
+4. If imageDownloads exist, create download and file organization instructions
+5. Create comprehensive, actionable instructions for Claude Code IDE with precise selectors
+6. Use final_answer with the formatted instructions as a string
 
 **Example of improved instruction generation:**
 Instead of: "Alterar estilo do texto para itálico no elemento <p>"
 Generate: "Alterar estilo do texto para itálico no elemento .hero-text p:first-child"
+
+**Example with image downloads:**
+\`\`\`
+## 🖼️ Image Assets Setup
+1. Create assets directory: mkdir -p src/assets/images
+2. Download generated images:
+   - curl "https://oaidalleapi..." -o "src/assets/images/frontable-2024-01-15-abc123.png"
+3. Update CSS references from temporary URLs to local paths
+
+## 📝 CSS Modifications
+1. Update .hero background-image to use local asset path
+\`\`\`
 
 ## INTERACTIVE ELEMENT BEST PRACTICES
 
@@ -908,8 +954,11 @@ Current Styling:`;
       
       // Actually insert the element into the DOM
       if (newElement) {
-        const insertionPoint = this.findInsertionPoint(selectedElements);
-        insertionPoint.appendChild(newElement);
+        // Determine insertion strategy based on description context and explicit mode
+        const insertionMode = this.determineInsertionMode(description, selectedElements, params.insertionMode);
+        const insertionInfo = this.findInsertionPoint(selectedElements, insertionMode);
+        
+        this.insertElementAtPoint(newElement, insertionInfo);
         
         // Add visual indicator for new element
         this.addNewElementIndicator(newElement);
@@ -920,13 +969,20 @@ Current Styling:`;
             action: 'create_element',
             explanation: `Elemento criado: ${description}`,
             styles: {}, // No styles applied, just element creation
-            html: html || newElement.outerHTML
+            html: html || newElement.outerHTML,
+            insertionMode: insertionMode
           },
           newElement,
           `createElement: ${description}`
         );
         
-        return `✅ Elemento criado: ${description}. O novo elemento foi adicionado à página.`;
+        const actionMessage = insertionMode === 'replace' 
+          ? 'substituído' 
+          : insertionMode === 'after' || insertionMode === 'before'
+            ? 'inserido adjacente ao elemento selecionado'
+            : 'adicionado à página';
+            
+        return `✅ Elemento criado: ${description}. O novo elemento foi ${actionMessage}.`;
       }
       
       return 'Falha ao criar elemento.';
@@ -981,9 +1037,11 @@ Current Styling:`;
         this.addJavaScriptBehavior(newElement, javascript);
       }
       
-      // Insert into DOM
-      const insertionPoint = this.findInsertionPoint(elementSelectors);
-      insertionPoint.appendChild(newElement);
+      // Determine insertion strategy based on description context and explicit mode
+      const insertionMode = this.determineInsertionMode(description, elementSelectors, params.insertionMode);
+      const insertionInfo = this.findInsertionPoint(elementSelectors, insertionMode);
+      
+      this.insertElementAtPoint(newElement, insertionInfo);
       
       // Add visual indicator for new element
       this.addNewElementIndicator(newElement);
@@ -994,10 +1052,15 @@ Current Styling:`;
         explanation: `Elemento interativo criado: ${description}`,
         styles: {},
         html: newElement.outerHTML,
-        javascript: javascript || ''
+        javascript: javascript || '',
+        insertionMode: insertionMode
       }, newElement, `createInteractiveElement: ${description}`);
       
-      return `✅ Elemento interativo criado: ${description}. Comportamento JavaScript adicionado.`;
+      const actionMessage = insertionMode === 'replace' 
+        ? 'substituído com comportamento interativo' 
+        : 'criado com comportamento JavaScript';
+        
+      return `✅ Elemento interativo criado: ${description}. ${actionMessage}.`;
       
     } catch (error) {
       console.error('Error creating interactive element:', error);
@@ -1070,7 +1133,7 @@ Current Styling:`;
       const results = [];
       
       // Add behavior to each element
-      elements.forEach((element, index) => {
+      elements.forEach((element) => {
         try {
           // Add each event handler
           Object.entries(events).forEach(([eventType, handlerCode]) => {
@@ -1368,7 +1431,7 @@ Current Styling:`;
     return elements.map(element => this.getElementSelector(element)).filter(Boolean);
   }
 
-  findInsertionPoint(elementSelectors) {
+  findInsertionPoint(elementSelectors, insertionMode = 'append') {
     // Handle both element selectors and actual elements
     let elements = [];
     
@@ -1385,13 +1448,52 @@ Current Styling:`;
     
     if (elements.length > 0) {
       const lastSelected = elements[elements.length - 1];
+      
+      // For replacement mode, return info needed for replacement
+      if (insertionMode === 'replace') {
+        return {
+          type: 'replace',
+          target: lastSelected,
+          parent: lastSelected.parentNode,
+          nextSibling: lastSelected.nextSibling
+        };
+      }
+      
+      // For adjacent insertion
+      if (insertionMode === 'after') {
+        return {
+          type: 'after', 
+          target: lastSelected,
+          parent: lastSelected.parentNode,
+          nextSibling: lastSelected.nextSibling
+        };
+      }
+      
+      if (insertionMode === 'before') {
+        return {
+          type: 'before',
+          target: lastSelected,
+          parent: lastSelected.parentNode,
+          nextSibling: lastSelected
+        };
+      }
+      
+      // Default append mode - insert into parent
       const parent = lastSelected.parentNode;
       if (parent) {
-        return parent;
+        return {
+          type: 'append',
+          target: parent,
+          parent: parent
+        };
       }
     }
     
-    return document.body;
+    return {
+      type: 'append',
+      target: document.body,
+      parent: document.body
+    };
   }
 
   addNewElementIndicator(element) {
@@ -1416,6 +1518,79 @@ Current Styling:`;
     setTimeout(() => {
       element.style.animation = '';
     }, 2000);
+  }
+
+  // Simple method to provide insertion options - let LLM decide
+  determineInsertionMode(description, selectedElements = [], explicitMode = null) {
+    // If LLM explicitly chose a mode, use it
+    if (explicitMode && ['append', 'replace', 'after', 'before'].includes(explicitMode)) {
+      return explicitMode;
+    }
+    
+    // Default strategy: if elements selected, likely replacement, otherwise append
+    return selectedElements.length > 0 ? 'replace' : 'append';
+  }
+
+  // Insert element at the determined point with proper strategy
+  insertElementAtPoint(newElement, insertionInfo) {
+    try {
+      switch (insertionInfo.type) {
+        case 'replace':
+          if (insertionInfo.target && insertionInfo.parent) {
+            // Replace the target element - insert before the target, then remove it
+            insertionInfo.parent.insertBefore(newElement, insertionInfo.target);
+            insertionInfo.parent.removeChild(insertionInfo.target);
+          }
+          break;
+          
+        case 'after':
+          if (insertionInfo.parent) {
+            insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
+          }
+          break;
+          
+        case 'before':
+          if (insertionInfo.parent) {
+            insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
+          }
+          break;
+          
+        case 'append':
+        default:
+          if (insertionInfo.target) {
+            insertionInfo.target.appendChild(newElement);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error inserting element:', error);
+      // Fallback to body append
+      document.body.appendChild(newElement);
+    }
+  }
+
+  // Analyze parent context for better LLM decision making
+  analyzeElementContext(element) {
+    if (!element || !element.parentNode) {
+      return null;
+    }
+    
+    const parent = element.parentNode;
+    const siblings = Array.from(parent.children);
+    const elementIndex = siblings.indexOf(element);
+    
+    return {
+      parent: parent,
+      parentTag: parent.tagName.toLowerCase(),
+      parentClasses: Array.from(parent.classList),
+      siblings: siblings,
+      elementIndex: elementIndex,
+      previousSibling: siblings[elementIndex - 1] || null,
+      nextSibling: siblings[elementIndex + 1] || null,
+      totalSiblings: siblings.length,
+      isFirstChild: elementIndex === 0,
+      isLastChild: elementIndex === siblings.length - 1
+    };
   }
 
   // Wrapper methods to handle different parameter formats from Ajent LLM
@@ -1556,7 +1731,8 @@ Current Styling:`;
         description: params.description,
         html: params.html || null,
         css: params.css || null,
-        selectedElements: selectedElements
+        selectedElements: selectedElements,
+        insertionMode: params.insertionMode || null
       });
     }
     
@@ -1643,7 +1819,8 @@ Current Styling:`;
       html: params.html,
       css: params.css || null,
       javascript: params.javascript || null,
-      elementSelectors: elementSelectors
+      elementSelectors: elementSelectors,
+      insertionMode: params.insertionMode || null
     });
   }
 
@@ -1720,11 +1897,15 @@ Current Styling:`;
         return 'No changes made yet. Make some modifications first before requesting instructions.';
       }
       
-      // Return raw history data as JSON string for LLM to analyze
+      // Process history to find temporary image URLs and create download instructions
+      const processedHistory = await this.processImageUrlsInHistory(history);
+      
+      // Return processed history data as JSON string for LLM to analyze
       const historyData = {
-        changeHistory: history,
-        totalChanges: history.length,
-        message: `Raw change history with ${history.length} modifications ready for Claude Code instruction generation.`
+        changeHistory: processedHistory.history,
+        totalChanges: processedHistory.history.length,
+        imageDownloads: processedHistory.imageDownloads,
+        message: `Raw change history with ${processedHistory.history.length} modifications ready for Claude Code instruction generation.`
       };
       
       return JSON.stringify(historyData, null, 2);
@@ -1733,6 +1914,93 @@ Current Styling:`;
       console.error('Error getting change history:', error);
       return `Failed to get change history: ${error.message}`;
     }
+  }
+
+  async processImageUrlsInHistory(history) {
+    const imageDownloads = [];
+    const processedHistory = [];
+    
+    for (const change of history) {
+      let processedChange = { ...change };
+      
+      // Check for temporary image URLs in various fields
+      const tempUrlPattern = /(https:\/\/oaidalleapiprodscus\.blob\.core\.windows\.net\/[^)"\s]+)/g;
+      
+      // Process styles object
+      if (change.appliedChanges && change.appliedChanges.styles) {
+        const styles = { ...change.appliedChanges.styles };
+        
+        for (const [property, value] of Object.entries(styles)) {
+          if (typeof value === 'string' && tempUrlPattern.test(value)) {
+            const matches = value.match(tempUrlPattern);
+            if (matches) {
+              for (const url of matches) {
+                const filename = this.generateImageFilename(url, change.timestamp);
+                const localPath = `./src/assets/images/${filename}`;
+                
+                // Add to download instructions
+                imageDownloads.push({
+                  originalUrl: url,
+                  filename: filename,
+                  localPath: localPath,
+                  cssProperty: property,
+                  timestamp: change.timestamp
+                });
+                
+                // Update the style value with local path
+                styles[property] = value.replace(url, localPath);
+              }
+            }
+          }
+        }
+        
+        processedChange.appliedChanges.styles = styles;
+      }
+      
+      // Process other fields that might contain image URLs
+      if (change.response && typeof change.response === 'string') {
+        const matches = change.response.match(tempUrlPattern);
+        if (matches) {
+          for (const url of matches) {
+            const filename = this.generateImageFilename(url, change.timestamp);
+            const localPath = `./src/assets/images/${filename}`;
+            
+            imageDownloads.push({
+              originalUrl: url,
+              filename: filename,
+              localPath: localPath,
+              context: 'response',
+              timestamp: change.timestamp
+            });
+            
+            processedChange.response = change.response.replace(url, localPath);
+          }
+        }
+      }
+      
+      processedHistory.push(processedChange);
+    }
+    
+    return {
+      history: processedHistory,
+      imageDownloads: imageDownloads
+    };
+  }
+
+  generateImageFilename(url, timestamp) {
+    // Extract image format from URL or default to png
+    let extension = 'png';
+    if (url.includes('.jpg') || url.includes('.jpeg')) {
+      extension = 'jpg';
+    } else if (url.includes('.webp')) {
+      extension = 'webp';
+    }
+    
+    // Create filename with timestamp and random suffix
+    const date = new Date(timestamp).toISOString().split('T')[0];
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    
+    return `frontable-${date}-${randomSuffix}.${extension}`;
   }
 
 
@@ -1787,7 +2055,9 @@ Current Styling:`;
       // Call OpenAI API to generate image
       console.log('🎨 Generating image with prompt:', prompt);
       
-      const response = await fetch('https://spinal.onrender.com/text-to-image', {
+      const url = 'https://spinal.onrender.com/text-to-image';
+      //const url = 'http://localhost:5000/text-to-image';
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

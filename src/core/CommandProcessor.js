@@ -15,6 +15,7 @@ class CommandProcessor {
         agents,
         apiToken: apiToken
       });
+      //apiUrl: 'http://localhost:5000'
       this.hasAI = true;
     } else {
       this.squad = null;
@@ -171,7 +172,8 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
       const agents = [new DOMManipulationAgent()];
       this.squad = new Squad({
         agents,
-        apiToken: apiToken
+        apiToken: apiToken,
+
       });
       this.hasAI = true;
     } else {

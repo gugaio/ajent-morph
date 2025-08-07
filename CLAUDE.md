@@ -54,6 +54,9 @@ O sistema usa integração avançada com Large Language Model para:
 - **deleteElement**: Remove elementos de forma segura com confirmação
 - **analyzeElement**: Fornece informações detalhadas do elemento e estilos computados
 - **generateClaudeCodeInstructions**: Gera instruções para Claude Code IDE baseadas no histórico de mudanças
+  - **Gestão Inteligente de Assets**: Detecta URLs temporárias de imagens e gera instruções para download local
+  - **Organização Automática**: Cria estrutura de pastas e nomenclatura consistente para assets
+  - **Atualização de Referências**: Converte URLs temporárias para caminhos locais automaticamente
 
 ## Pipeline de Processamento de Comandos
 
@@ -69,6 +72,13 @@ Entrada do Usuário → Análise de Intenção → Seleção de Ferramenta → M
 6. **Rastreamento de Histórico**: Mudança é registrada para possíveis operações de desfazer
 
 ## Recursos Avançados
+
+### Gestão Inteligente de Assets
+- **Detecção Automática de URLs Temporárias**: Identifica imagens com URLs que expiram (Azure, AWS S3, etc.)
+- **Download e Organização**: Gera instruções para baixar imagens e organizá-las no projeto
+- **Conversão de Referências**: Atualiza automaticamente CSS e HTML para usar caminhos locais
+- **Nomenclatura Consistente**: Cria nomes de arquivo baseados em timestamp e identificadores únicos
+- **Estrutura de Pastas**: Organiza assets em `src/assets/images/` seguindo melhores práticas
 
 ### Análise Inteligente de Elementos
 - **Detecção de Estilos Computados**: Lê valores CSS reais da renderização do navegador
