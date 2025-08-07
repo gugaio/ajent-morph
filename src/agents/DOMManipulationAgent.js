@@ -17,6 +17,7 @@ class DOMManipulationAgent extends Agent {
     this.addTool(new Tool('deleteElement', 'Delete selected DOM elements. Call with: {"elementSelectors": ["#id", ".class"], "confirmation": true}', (params) => this.deleteElementWrapper(params)));
     this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
     this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', (params) => this.generateImageWrapper(params)));
+    this.addTool(new Tool('planTask', 'Create or update a visual task plan for complex operations. Call with: {"action": "create|update", "tasks": [{"description": "task description", "status": "pending|in_progress|completed"}]}', (params) => this.planTaskWrapper(params)));
   }
 
   instruction = () => {
@@ -49,6 +50,19 @@ class DOMManipulationAgent extends Agent {
 
 **Wrong approach:** deleteElement + createElement → element ends up at bottom of page
 **Correct approach:** createElement with insertionMode: "replace" → element replaces original position
+
+### 📋 AUTOMATIC TASK PLANNING WORKFLOW
+**For complex commands, ALWAYS follow this sequence:**
+1. **FIRST:** Call planTask with action: "create" and break down the task into 3-8 steps
+2. **THEN:** Execute each step while calling planTask with action: "update" to show progress  
+3. **FINALLY:** Complete all tasks and let the plan auto-hide after 3 seconds
+
+**Example complex command workflow:**
+User: "Crie um formulário de contato completo"
+1. planTask(action: "create", tasks: [...]) → Show plan to user
+2. createInteractiveElement(...) → Create form structure  
+3. planTask(action: "update", tasks: [...]) → Update progress
+4. Continue until all steps completed
 
 ### 🔍 INFORMATION REQUESTS (NO TOOLS NEEDED)
 **When:** User wants to know about current element properties/styles
@@ -99,6 +113,18 @@ class DOMManipulationAgent extends Agent {
 **Examples:** "Gerar instruções Claude Code", "Instruções para IDE", "Claude Code instructions", "generate IDE instructions"
 **Action:** Call generateClaudeCodeInstructions tool, then parse and analyze the returned JSON data
 **NOTE:** This tool returns a JSON string with changeHistory array containing elementContext - you must parse, analyze, and create specific instructions using unique selectors
+
+#### 9. TASK PLANNING INTENT (AUTO-TRIGGERED)
+**When:** User requests complex operations that require multiple steps
+**Examples:** "Crie um formulário completo", "Transforme em dark mode", "Faça um dashboard", "Adicione sistema de navegação", "Construa uma landing page", "Crie um sistema de login"
+**Action:** AUTOMATICALLY call planTask tool first to break down the task, then execute each step while updating progress
+**Benefits:** Better organization, user visibility, reduced errors, step-by-step execution
+
+**AUTOMATIC PLANNING TRIGGERS:**
+- Commands with words like: "completo", "sistema", "dashboard", "formulário", "navegação", "página", "website", "aplicação"
+- Multi-component requests: "formulário com validação e envio", "header com menu e logo"
+- Style transformations: "transforme em dark mode", "faça responsivo"
+- Complex UI: "crie um modal", "adicione carousel", "faça slider"
 
 ## CRITICAL: WHEN NOT TO USE TOOLS
 
@@ -265,6 +291,18 @@ generateClaudeCodeInstructions()
   - Download each image from originalUrl and save as filename
   - Update CSS references to use localPath instead of temporary URLs
   - Provide specific curl or fetch commands for downloading images
+
+### For Task Planning (planTask):
+**CRITICAL:** You must call planTask with action and tasks array format.
+
+**IMPORTANT for planTask:**
+- Use \"create\" action for new task plans, \"update\" for modifying existing ones
+- Each task must have description and status (\"pending\", \"in_progress\", \"completed\")
+- Break complex operations into 3-8 manageable steps
+- Update task status as you work through the plan
+- Always show the updated plan to the user for transparency
+- Use this tool for commands that require multiple coordinated steps
+- Examples: \"Create complete dashboard\", \"Transform to dark theme\", \"Build navigation system\"
 
 
 ## CSS GENERATION GUIDELINES
@@ -2205,6 +2243,105 @@ Current Styling:`;
       prompt: actualParams.prompt,
       elementSelectors: elementSelectors,
       applyAs: actualParams.applyAs || 'background'
+    });
+  }
+
+  async planTask(params) {
+    const { action, tasks } = params;
+    
+    if (!action || !tasks) {
+      return 'Action and tasks parameters are required for task planning.';
+    }
+    
+    if (!Array.isArray(tasks)) {
+      return 'Tasks parameter must be an array of task objects.';
+    }
+    
+    // Validate task format
+    const validTasks = tasks.every(task => 
+      task.description && 
+      task.status && 
+      ['pending', 'in_progress', 'completed'].includes(task.status)
+    );
+    
+    if (!validTasks) {
+      return 'Invalid task format. Each task must have description and valid status.';
+    }
+    
+    try {
+      // Store task plan in a way the UI can access
+      if (typeof window !== 'undefined') {
+        if (!window.ajentTaskPlan) {
+          window.ajentTaskPlan = {};
+        }
+        
+        window.ajentTaskPlan = {
+          action: action,
+          tasks: tasks,
+          timestamp: Date.now(),
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter(t => t.status === 'completed').length,
+          inProgressTasks: tasks.filter(t => t.status === 'in_progress').length,
+          pendingTasks: tasks.filter(t => t.status === 'pending').length
+        };
+        
+        // Trigger event for UI to update
+        window.dispatchEvent(new CustomEvent('ajentTaskPlanUpdate', {
+          detail: window.ajentTaskPlan
+        }));
+      }
+      
+      const progressMsg = action === 'create' ? 'Plano de tarefas criado:' : 'Plano de tarefas atualizado:';
+      let response = `🎯 ${progressMsg}\n\n`;
+      
+      tasks.forEach((task, index) => {
+        const emoji = task.status === 'completed' ? '✅' : 
+                     task.status === 'in_progress' ? '🔄' : '⏳';
+        response += `${emoji} ${index + 1}. ${task.description}\n`;
+      });
+      
+      const stats = `\n📊 Progresso: ${window.ajentTaskPlan?.completedTasks || 0}/${tasks.length} concluídas`;
+      response += stats;
+      
+      return response;
+      
+    } catch (error) {
+      console.error('Error in planTask:', error);
+      return `Erro ao gerenciar plano de tarefas: ${error.message}`;
+    }
+  }
+
+  async planTaskWrapper(params) {
+    console.log('planTaskWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Action and tasks parameters are required');
+    }
+    
+    // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
+    let actualParams = params;
+    if (params.params && typeof params.params === 'string') {
+      try {
+        actualParams = JSON.parse(params.params);
+        console.log('Parsed actualParams for planTask:', actualParams);
+      } catch (error) {
+        console.warn('Failed to parse params.params:', error);
+        actualParams = params;
+      }
+    }
+    
+    // Validate required parameters
+    if (!actualParams.action) {
+      throw new Error('Action parameter is required (create or update)');
+    }
+    
+    if (!actualParams.tasks || !Array.isArray(actualParams.tasks)) {
+      throw new Error('Tasks parameter is required and must be an array');
+    }
+    
+    return this.planTask({
+      action: actualParams.action,
+      tasks: actualParams.tasks
     });
   }
 }

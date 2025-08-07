@@ -29,6 +29,14 @@ class ChatInterface {
       
       <div class="dsa-messages"></div>
       
+      <div class="dsa-task-progress" style="display: none;">
+        <div class="dsa-task-header">
+          <span class="dsa-task-title">🎯 Plano de Execução</span>
+          <span class="dsa-task-stats">0/0</span>
+        </div>
+        <div class="dsa-task-list"></div>
+      </div>
+      
       <div class="dsa-input-container">
         <div class="dsa-input-wrapper">
           <textarea 
@@ -54,6 +62,7 @@ class ChatInterface {
     
     document.body.appendChild(this.panel);
     this.setupEventListeners();
+    this.setupTaskProgressListener();
   }
   
   setupEventListeners() {
@@ -202,6 +211,74 @@ class ChatInterface {
       }
       preview.remove();
     });
+  }
+
+  setupTaskProgressListener() {
+    // Listen for task plan updates from the DOMManipulationAgent
+    window.addEventListener('ajentTaskPlanUpdate', (event) => {
+      this.updateTaskProgress(event.detail);
+    });
+  }
+
+  updateTaskProgress(taskPlan) {
+    const progressContainer = this.panel.querySelector('.dsa-task-progress');
+    const statsElement = this.panel.querySelector('.dsa-task-stats');
+    const listElement = this.panel.querySelector('.dsa-task-list');
+    
+    if (!progressContainer || !taskPlan) return;
+    
+    // Show progress container
+    progressContainer.style.display = 'block';
+    
+    // Update stats
+    const completed = taskPlan.completedTasks || 0;
+    const total = taskPlan.totalTasks || 0;
+    statsElement.textContent = `${completed}/${total}`;
+    
+    // Update task list
+    listElement.innerHTML = '';
+    
+    if (taskPlan.tasks && Array.isArray(taskPlan.tasks)) {
+      taskPlan.tasks.forEach((task) => {
+        const taskElement = document.createElement('div');
+        taskElement.className = 'dsa-task-item';
+        
+        let emoji = '⏳';
+        let statusClass = 'pending';
+        
+        if (task.status === 'completed') {
+          emoji = '✅';
+          statusClass = 'completed';
+        } else if (task.status === 'in_progress') {
+          emoji = '🔄';
+          statusClass = 'in_progress';
+        }
+        
+        taskElement.innerHTML = `
+          <span class="dsa-task-emoji">${emoji}</span>
+          <span class="dsa-task-description">${task.description}</span>
+        `;
+        
+        taskElement.classList.add(`dsa-task-${statusClass}`);
+        listElement.appendChild(taskElement);
+      });
+    }
+    
+    // Auto-hide when all tasks are completed
+    if (completed === total && total > 0) {
+      setTimeout(() => {
+        progressContainer.style.display = 'none';
+      }, 3000);
+    }
+    
+    this.scrollToBottom();
+  }
+
+  hideTaskProgress() {
+    const progressContainer = this.panel.querySelector('.dsa-task-progress');
+    if (progressContainer) {
+      progressContainer.style.display = 'none';
+    }
   }
 }
 

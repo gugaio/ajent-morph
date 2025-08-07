@@ -217,8 +217,16 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         return element.tagName.toLowerCase();
       }).filter(Boolean);
 
+      // Check if this is a complex command that should trigger automatic task planning
+      const isComplexCommand = this.detectComplexCommand(message);
+      
       // Create a context-rich prompt for the LLM that includes element information and selectors
       let contextPrompt = `User command: "${message}"\n\n`;
+      
+      if (isComplexCommand) {
+        contextPrompt += `COMPLEX COMMAND DETECTED: This appears to be a multi-step operation.\n`;
+        contextPrompt += `REQUIRED: Call planTask tool FIRST to break down this task into manageable steps, then execute each step.\n\n`;
+      }
       
       if (isClaudeCodeRequest) {
         contextPrompt += `SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n`;
@@ -328,6 +336,46 @@ The element selectors will be used to reconstruct the DOM elements within the to
       success: false,
       fallback: true
     };
+  }
+
+  // Detect if a command is complex and should trigger automatic task planning
+  detectComplexCommand(message) {
+    const lowerMessage = message.toLowerCase();
+    
+    // Keywords that indicate complex operations
+    const complexKeywords = [
+      'completo', 'sistema', 'dashboard', 'formulário', 'navegação', 
+      'página', 'website', 'aplicação', 'modal', 'carousel', 'slider',
+      'login', 'registro', 'cadastro', 'checkout', 'carrinho',
+      'dark mode', 'responsivo', 'landing', 'portfolio', 'blog'
+    ];
+    
+    // Multi-component phrases
+    const multiComponentPhrases = [
+      'com validação', 'com envio', 'com menu', 'com logo', 
+      'com botões', 'com campos', 'com animação', 'interativo',
+      'funcional', 'dinâmico'
+    ];
+    
+    // Check for complex keywords
+    const hasComplexKeyword = complexKeywords.some(keyword => 
+      lowerMessage.includes(keyword)
+    );
+    
+    // Check for multi-component indicators
+    const hasMultiComponent = multiComponentPhrases.some(phrase => 
+      lowerMessage.includes(phrase)
+    );
+    
+    // Check for transformation requests
+    const isTransformation = lowerMessage.includes('transforme') || 
+                           lowerMessage.includes('converta') ||
+                           lowerMessage.includes('mude para') ||
+                           lowerMessage.includes('faça');
+    
+    // Consider it complex if it has multiple indicators or specific patterns
+    return hasComplexKeyword || hasMultiComponent || 
+           (isTransformation && lowerMessage.split(' ').length > 4);
   }
 
   // Verifica se AI está disponível
