@@ -1,12 +1,50 @@
 import { Agent, Tool } from 'ajent';
 import ResponseApplier from '../core/ResponseApplier.js';
+import IntentionClassifier from '../utils/IntentionClassifier.js';
+import EnhancedValidator from '../utils/EnhancedValidator.js';
+import ErrorRecoverySystem from '../utils/ErrorRecoverySystem.js';
+import SmartRetrySystem from '../utils/SmartRetrySystem.js';
+import AccessibilityChecker from '../utils/AccessibilityChecker.js';
+import EnhancedTaskPlanner from '../utils/EnhancedTaskPlanner.js';
+import { getSystemIntegrityChecker } from '../utils/SystemIntegrityChecker.js';
 
 class DOMManipulationAgent extends Agent {
   constructor() {
     super('dom_manipulation', 'Expert in DOM manipulation and CSS styling based on natural language commands');
     
-    // Initialize ResponseApplier for applying styles and maintaining history
-    this.applier = new ResponseApplier();
+    // Initialize system integrity checker first
+    this.systemChecker = getSystemIntegrityChecker();
+    
+    // Initialize core systems with error handling
+    try {
+      this.applier = new ResponseApplier();
+      this.intentionClassifier = new IntentionClassifier();
+      this.validator = new EnhancedValidator();
+      this.errorRecovery = new ErrorRecoverySystem();
+      this.retrySystem = new SmartRetrySystem();
+      this.accessibilityChecker = new AccessibilityChecker();
+      this.taskPlanner = new EnhancedTaskPlanner();
+      
+      // Enable real-time accessibility alerts
+      this.accessibilityChecker.setRealTimeAlerts(true, (report) => {
+        if (!report.isAccessible) {
+          console.warn('🚨 Accessibility Issue Detected:', report);
+        }
+      });
+      
+      // Run initial integrity check
+      this.runInitialIntegrityCheck();
+      
+    } catch (error) {
+      console.error('Error initializing DOMManipulationAgent systems:', error);
+      
+      // Initialize minimal fallback systems
+      this.applier = new ResponseApplier();
+      this.initializeFallbackSystems();
+    }
+
+    // Initialize chat interface reference for progress feedback
+    this.chatInterface = null;
 
     this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', (params) => this.applyStylesWrapper(params)));
     this.addTool(new Tool('validateStyles', 'Validate CSS properties and values. Call with: {"styles": object_with_css_properties}', (params) => this.validateStylesWrapper(params)));
@@ -18,6 +56,40 @@ class DOMManipulationAgent extends Agent {
     this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
     this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', (params) => this.generateImageWrapper(params)));
     this.addTool(new Tool('planTask', 'Create or update a visual task plan for complex operations. Call with: {"action": "create|update", "tasks": [{"description": "task description", "status": "pending|in_progress|completed"}]}', (params) => this.planTaskWrapper(params)));
+  }
+
+  /**
+   * Sets the chat interface for progress feedback
+   */
+  setChatInterface(chatInterface) {
+    this.chatInterface = chatInterface;
+  }
+
+  /**
+   * Shows progress status if chat interface is available
+   */
+  showProgress(message, type = 'processing') {
+    if (this.chatInterface && this.chatInterface.showProgressStatus) {
+      this.chatInterface.showProgressStatus(message, type);
+    }
+  }
+
+  /**
+   * Updates progress status if chat interface is available
+   */
+  updateProgress(message, type = 'processing') {
+    if (this.chatInterface && this.chatInterface.updateProgressStatus) {
+      this.chatInterface.updateProgressStatus(message, type);
+    }
+  }
+
+  /**
+   * Removes progress status
+   */
+  hideProgress() {
+    if (this.chatInterface && this.chatInterface.removeProgressStatus) {
+      this.chatInterface.removeProgressStatus();
+    }
   }
 
   instruction = () => {
@@ -296,13 +368,13 @@ generateClaudeCodeInstructions()
 **CRITICAL:** You must call planTask with action and tasks array format.
 
 **IMPORTANT for planTask:**
-- Use \"create\" action for new task plans, \"update\" for modifying existing ones
-- Each task must have description and status (\"pending\", \"in_progress\", \"completed\")
+- Use 'create' action for new task plans, 'update' for modifying existing ones
+- Each task must have description and status ('pending', 'in_progress', 'completed')
 - Break complex operations into 3-8 manageable steps
 - Update task status as you work through the plan
 - Always show the updated plan to the user for transparency
 - Use this tool for commands that require multiple coordinated steps
-- Examples: \"Create complete dashboard\", \"Transform to dark theme\", \"Build navigation system\"
+- Examples: 'Create complete dashboard', 'Transform to dark theme', 'Build navigation system'
 
 
 ## CSS GENERATION GUIDELINES
@@ -698,37 +770,146 @@ Current Styling:`;
   }
 
   async applyStyles(params) {
-    // Defensive parameter validation
+    try {
+      const result = await this.retrySystem.executeWithRetry(
+        () => this._applyStylesInternal(params),
+        'css_validation',
+        { operation: 'applyStyles', ...params }
+      );
+      
+      // Handle retry system result format
+      if (result && typeof result === 'object' && result.success !== undefined) {
+        return result.success ? result.result : result.message;
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('applyStyles failed even with retry:', error);
+      
+      // Try error recovery
+      const recovery = await this.errorRecovery.handleError(error, {
+        operation: 'applyStyles',
+        params
+      });
+      
+      return recovery.userMessage;
+    }
+  }
+
+  async _applyStylesInternal(params, recursionDepth = 0) {
+    // Show progress feedback
+    this.showProgress('Iniciando validação de estilos', 'validation');
+    
+    // Prevent infinite recursion
+    if (recursionDepth > 2) {
+      console.warn('🔄 Maximum recursion depth reached, applying styles without further validation');
+      this.updateProgress('Aplicando estilos diretamente', 'applying');
+      const result = await this._applyStylesDirectly(params);
+      this.hideProgress();
+      return result;
+    }
+    
+    // Enhanced parameter validation
     if (!params) {
-      console.error('applyStyles called with undefined params');
-      throw new Error('Parameters object is required');
+      const error = new Error('Parameters object is required');
+      const recovery = await this.errorRecovery.handleError(error, { operation: 'applyStyles' });
+      if (!recovery.success) {
+        throw error;
+      }
+      return recovery.userMessage;
     }
     
     const { description, styles, selectedElements = [] } = params;
     
-    if (!description) {
-      console.error('applyStyles called without description:', params);
-      throw new Error('Description parameter is required');
-    }
+    // Update progress
+    this.updateProgress('Validando propriedades CSS', 'css');
     
-    if (!styles) {
-      console.error('applyStyles called without styles:', params);
-      throw new Error('Styles parameter is required');
+    // Validate inputs with enhanced validator
+    const validationResult = this.validator.validateStyles(styles, {
+      elementCount: selectedElements.length,
+      operation: 'applyStyles'
+    });
+    
+    if (!validationResult.isValid) {
+      const errorMessages = validationResult.errors && validationResult.errors.length > 0 
+        ? validationResult.errors.join(', ')
+        : 'Unknown validation errors';
+      
+      const error = new Error(`CSS Validation Failed: ${errorMessages}`);
+      
+      try {
+        const recovery = await this.errorRecovery.handleError(error, {
+          operation: 'applyStyles',
+          styles,
+          validationResult
+        });
+        
+        if (recovery.success && recovery.correctedStyles) {
+          // Use corrected styles from recovery with incremented recursion depth
+          return this._applyStylesInternal({
+            ...params,
+            styles: recovery.correctedStyles
+          }, recursionDepth + 1);
+        }
+        
+        return recovery.userMessage;
+      } catch (recoveryError) {
+        console.warn('Error recovery failed:', recoveryError);
+        
+        // Try to use valid styles if any exist
+        if (validationResult.validStyles && Object.keys(validationResult.validStyles).length > 0) {
+          console.log('🔄 Using valid styles only, ignoring invalid ones');
+          return this._applyStylesInternal({
+            ...params,
+            styles: validationResult.validStyles
+          }, recursionDepth + 1);
+        }
+        
+        return `❌ Erro de validação CSS: ${errorMessages}. Verifique a sintaxe dos estilos.`;
+      }
     }
 
     if (!selectedElements || selectedElements.length === 0) {
       return 'Nenhum elemento selecionado para aplicar estilos.';
     }
     
-    // Validate and normalize the provided styles
-    const normalizedStyles = this.normalizeStyles(styles);
-    
-    // Validate CSS properties
-    const validation = await this.validateStyles({ styles: normalizedStyles });
-    
-    if (!validation.isValid) {
-      console.warn('Invalid styles detected:', validation.errors);
-      // Continue with valid styles only
+    // Use enhanced validation results
+    const normalizedStyles = validationResult.validStyles;
+
+    // Update progress
+    this.updateProgress('Aplicando estilos aos elementos', 'applying');
+
+    // Check accessibility before applying
+    this.updateProgress('Verificando acessibilidade', 'accessibility');
+    const accessibilityResults = [];
+    for (const element of selectedElements) {
+      try {
+        const accessibilityCheck = this.accessibilityChecker.checkElementAccessibility(
+          element, normalizedStyles
+        );
+        accessibilityResults.push(accessibilityCheck);
+      } catch (error) {
+        console.warn('Accessibility check failed:', error);
+        // Continue without accessibility check
+        accessibilityResults.push({
+          isAccessible: true,
+          errors: [],
+          warnings: [`Accessibility check failed: ${error.message}`],
+          suggestions: [],
+          fixes: []
+        });
+      }
+      
+      // Auto-fix accessibility issues if possible
+      const lastCheck = accessibilityResults[accessibilityResults.length - 1];
+      if (lastCheck.fixes && lastCheck.fixes.length > 0) {
+        for (const fix of lastCheck.fixes) {
+          if (fix.type === 'color_contrast' && fix.style) {
+            Object.assign(normalizedStyles, fix.style);
+            console.log(`🔧 Auto-fixed accessibility: ${fix.reason}`);
+          }
+        }
+      }
     }
 
     // Apply styles to each selected element
@@ -742,6 +923,7 @@ Current Styling:`;
       // Validate that element is a proper DOM element
       if (!element || !element.nodeType || element.nodeType !== Node.ELEMENT_NODE) {
         failureCount++;
+        console.warn('Invalid DOM element:', element);
         results.push({
           element: { tagName: 'invalid', id: null, classes: [], textContent: '' },
           success: false,
@@ -755,7 +937,7 @@ Current Styling:`;
         const result = await this.applier.applyLLMResponse(
           {
             action: description,
-            styles: validation.valid,
+            styles: normalizedStyles,
             explanation: description
           },
           element,
@@ -771,6 +953,7 @@ Current Styling:`;
           });
         } else {
           failureCount++;
+          console.warn('Failed to apply styles:', result.message);
           results.push({
             element: this.getElementInfo(element),
             success: false,
@@ -778,6 +961,7 @@ Current Styling:`;
           });
         }
       } catch (error) {
+        console.error('Error applying styles:', error);
         failureCount++;
         results.push({
           element: this.getElementInfo(element),
@@ -786,8 +970,7 @@ Current Styling:`;
         });
       }
     }
-
-    // Generate success message
+    // Generate enhanced success message with accessibility info
     let message = '';
     if (successCount > 0 && failureCount === 0) {
       message = `✅ ${description} aplicado com sucesso em ${successCount} elemento(s).`;
@@ -797,12 +980,79 @@ Current Styling:`;
       message = `❌ Falha ao aplicar ${description}. Nenhum elemento foi modificado.`;
     }
 
-    if (validation.errors.length > 0) {
-      message += ` Propriedades CSS inválidas ignoradas: ${validation.errors.join(', ')}`;
+    // Add validation feedback
+    if (validationResult && validationResult.warnings && validationResult.warnings.length > 0) {
+      message += ` Avisos: ${validationResult.warnings.slice(0, 2).join(', ')}`;
+    }
+    
+    if (validationResult && validationResult.suggestions && validationResult.suggestions.length > 0) {
+      message += ` Sugestões: ${validationResult.suggestions.slice(0, 2).join(', ')}`;
     }
 
-    // Return only string message for Ajent framework
+    // Add accessibility feedback
+    const accessibilityIssues = accessibilityResults.filter(r => !r.isAccessible).length;
+    if (accessibilityIssues > 0) {
+      message += ` ⚠️ ${accessibilityIssues} problema(s) de acessibilidade detectado(s).`;
+    }
+
+    // Show success and hide progress
+    if (successCount > 0) {
+      this.updateProgress('Estilos aplicados com sucesso!', 'success');
+      setTimeout(() => this.hideProgress(), 2000);
+    } else {
+      this.hideProgress();
+    }
+
     return message;
+  }
+
+  /**
+   * Apply styles directly without validation (fallback for recursion limit)
+   */
+  async _applyStylesDirectly(params) {
+    const { description, styles, selectedElements = [] } = params;
+    
+    if (!selectedElements || selectedElements.length === 0) {
+      return '⚠️ Nenhum elemento selecionado para aplicar estilos.';
+    }
+    
+    try {
+      // Apply styles directly to elements without validation
+      let successCount = 0;
+      const accessibilityResults = [];
+      
+      selectedElements.forEach(element => {
+        try {
+          Object.entries(styles).forEach(([property, value]) => {
+            // Convert camelCase to kebab-case for DOM styles
+            const cssProperty = property.replace(/([A-Z])/g, '-$1').toLowerCase();
+            element.style.setProperty(cssProperty, value);
+          });
+          
+          // Quick accessibility check without blocking
+          const accessibilityReport = this.accessibilityChecker.checkElementAccessibility(element, styles);
+          accessibilityResults.push(accessibilityReport);
+          
+          successCount++;
+        } catch (elementError) {
+          console.warn('Failed to apply styles to element:', elementError);
+        }
+      });
+      
+      // Generate response message
+      let message = `✅ ${description} aplicado diretamente em ${successCount} elemento(s).`;
+      
+      // Add accessibility feedback if needed
+      const accessibilityIssues = accessibilityResults.filter(r => !r.isAccessible).length;
+      if (accessibilityIssues > 0) {
+        message += ` ⚠️ ${accessibilityIssues} problema(s) de acessibilidade detectado(s).`;
+      }
+      
+      return message;
+      
+    } catch (error) {
+      return `❌ Falha ao aplicar estilos diretamente: ${error.message}`;
+    }
   }
 
   getElementInfo(element) {
@@ -909,55 +1159,51 @@ Current Styling:`;
   }
 
   async validateStyles(params) {
-    // Defensive parameter validation
-    if (!params) {
-      console.error('validateStyles called with undefined params');
-      throw new Error('Parameters object is required');
+    if (!params || !params.styles) {
+      return {
+        isValid: false,
+        errors: ['Styles parameter is required'],
+        validStyles: {},
+        suggestions: []
+      };
     }
     
-    const { styles } = params;
+    const parsedStyles = typeof params.styles === 'string' ? 
+      JSON.parse(params.styles) : params.styles;
     
-    if (!styles) {
-      console.error('validateStyles called without styles:', params);
-      throw new Error('Styles parameter is required');
-    }
-    
-    const parsedStyles = typeof styles === 'string' ? JSON.parse(styles) : styles;
-    const validCSSProperties = new Set([
-      'display', 'position', 'top', 'right', 'bottom', 'left',
-      'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
-      'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-      'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-      'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
-      'color', 'backgroundColor', 'border', 'borderTop', 'borderRight', 'borderBottom', 'borderLeft',
-      'borderColor', 'borderWidth', 'borderStyle', 'borderRadius',
-      'background', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat', 'backgroundAttachment',
-      'boxShadow', 'textShadow', 'textAlign', 'textDecoration', 'textTransform',
-      'flexDirection', 'justifyContent', 'alignItems', 'alignSelf', 'flex', 'flexGrow', 'flexShrink',
-      'gridTemplateColumns', 'gridTemplateRows', 'gridGap', 'gap',
-      'transform', 'transition', 'animation', 'opacity', 'visibility', 'overflow',
-      'cursor', 'userSelect', 'pointerEvents', 'zIndex'
-    ]);
-
-    const errors = [];
-    const validStyles = {};
-
-    Object.entries(parsedStyles).forEach(([prop, value]) => {
-      if (validCSSProperties.has(prop)) {
-        validStyles[prop] = value;
-      } else {
-        errors.push(`Invalid CSS property: ${prop}`);
-      }
+    return this.validator.validateStyles(parsedStyles, {
+      elementCount: params.selectedElements?.length || 0
     });
-
-    return {
-      valid: validStyles,
-      errors,
-      isValid: errors.length === 0
-    };
   }
 
   async createElement(params) {
+    try {
+      const result = await this.retrySystem.executeWithRetry(
+        () => this._createElementInternal(params),
+        'dom_manipulation',
+        { operation: 'createElement', ...params }
+      );
+      
+      // Handle retry system result format
+      if (result && typeof result === 'object' && result.success !== undefined) {
+        return result.success ? result.result : result.message;
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('createElement failed even with retry:', error);
+      
+      // Try error recovery
+      const recovery = await this.errorRecovery.handleError(error, {
+        operation: 'createElement',
+        params
+      });
+      
+      return recovery.userMessage;
+    }
+  }
+  
+  async _createElementInternal(params) {
     const { description, html, css, selectedElements = [] } = params;
     
     if (!description) {
@@ -1398,7 +1644,7 @@ Current Styling:`;
       } else if (successCount > 0 && failureCount > 0) {
         message = `⚠️ ${successCount} elemento(s) removidos. ${failureCount} falharam.`;
       } else {
-        message = `❌ Falha ao remover elementos. Nenhum elemento foi deletado.`;
+        message = '❌ Falha ao remover elementos. Nenhum elemento foi deletado.';
       }
       
       return message;
@@ -1573,32 +1819,32 @@ Current Styling:`;
   insertElementAtPoint(newElement, insertionInfo) {
     try {
       switch (insertionInfo.type) {
-        case 'replace':
-          if (insertionInfo.target && insertionInfo.parent) {
-            // Replace the target element - insert before the target, then remove it
-            insertionInfo.parent.insertBefore(newElement, insertionInfo.target);
-            insertionInfo.parent.removeChild(insertionInfo.target);
-          }
-          break;
-          
-        case 'after':
-          if (insertionInfo.parent) {
-            insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
-          }
-          break;
-          
-        case 'before':
-          if (insertionInfo.parent) {
-            insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
-          }
-          break;
-          
-        case 'append':
-        default:
-          if (insertionInfo.target) {
-            insertionInfo.target.appendChild(newElement);
-          }
-          break;
+      case 'replace':
+        if (insertionInfo.target && insertionInfo.parent) {
+          // Replace the target element - insert before the target, then remove it
+          insertionInfo.parent.insertBefore(newElement, insertionInfo.target);
+          insertionInfo.parent.removeChild(insertionInfo.target);
+        }
+        break;
+        
+      case 'after':
+        if (insertionInfo.parent) {
+          insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
+        }
+        break;
+        
+      case 'before':
+        if (insertionInfo.parent) {
+          insertionInfo.parent.insertBefore(newElement, insertionInfo.nextSibling);
+        }
+        break;
+        
+      case 'append':
+      default:
+        if (insertionInfo.target) {
+          insertionInfo.target.appendChild(newElement);
+        }
+        break;
       }
     } catch (error) {
       console.error('Error inserting element:', error);
@@ -1631,6 +1877,131 @@ Current Styling:`;
     };
   }
 
+  /**
+   * Runs initial system integrity check
+   */
+  async runInitialIntegrityCheck() {
+    try {
+      const result = await this.systemChecker.runIntegrityCheck();
+      if (!result.success) {
+        console.warn('⚠️ System integrity issues detected during initialization:', result.issues);
+      }
+    } catch (error) {
+      console.error('Failed to run integrity check:', error);
+    }
+  }
+
+  /**
+   * Initializes fallback systems when main systems fail
+   */
+  initializeFallbackSystems() {
+    console.log('🔄 Initializing fallback systems...');
+    
+    // Create minimal implementations
+    this.intentionClassifier = {
+      classifyIntention: (command) => ({
+        intention: 'modify',
+        confidence: 0.5,
+        reasoning: 'Using fallback classifier',
+        ambiguous: false
+      }),
+      addToHistory: () => {}
+    };
+    
+    this.validator = {
+      validateStyles: (styles) => ({
+        isValid: true,
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        validStyles: styles
+      })
+    };
+    
+    this.errorRecovery = {
+      handleError: async (error, context) => ({
+        success: false,
+        userMessage: `Error: ${error.message}`,
+        suggestions: ['Try again with a simpler command']
+      })
+    };
+    
+    this.retrySystem = {
+      executeWithRetry: async (operation) => {
+        try {
+          return await operation();
+        } catch (error) {
+          throw error;
+        }
+      }
+    };
+    
+    this.accessibilityChecker = {
+      checkElementAccessibility: () => ({
+        isAccessible: true,
+        errors: [],
+        warnings: [],
+        suggestions: [],
+        fixes: []
+      }),
+      setRealTimeAlerts: () => {}
+    };
+    
+    this.taskPlanner = {
+      createIntelligentPlan: (command) => ({
+        id: 'fallback_plan',
+        name: 'Simple Task',
+        subtasks: [{ name: command, status: 'pending' }],
+        totalTasks: 1
+      }),
+      formatPlanResponse: (plan) => `📋 Task: ${plan.name}`
+    };
+    
+    console.log('✅ Fallback systems initialized');
+  }
+
+  /**
+   * Analyzes user command and classifies intention before execution
+   */
+  async analyzeUserCommand(command, context = {}) {
+    try {
+      const classification = this.intentionClassifier.classifyIntention(
+        command,
+        context.selectedElements || [],
+        context
+      );
+      
+      // Add to classifier history
+      this.intentionClassifier.addToHistory(
+        command, 
+        classification.intention, 
+        classification.confidence
+      );
+      
+      // Generate confirmation if ambiguous
+      if (classification.ambiguous) {
+        const confirmation = this.intentionClassifier.generateConfirmationPrompt(
+          classification, 
+          command
+        );
+        
+        if (confirmation) {
+          console.warn('🤔 Ambiguous command detected:', confirmation.message);
+        }
+      }
+      
+      return classification;
+    } catch (error) {
+      console.error('Error analyzing user command:', error);
+      return {
+        intention: 'modify', // fallback
+        confidence: 0.3,
+        reasoning: 'Error in analysis, using fallback',
+        ambiguous: true
+      };
+    }
+  }
+
   // Wrapper methods to handle different parameter formats from Ajent LLM
   async analyzeElementWrapper(params) {
     if (!params || !params.elementData) {
@@ -1659,9 +2030,7 @@ Current Styling:`;
       }
     }
     
-    let selectedElements = [];
-    
-    // Handle new elementSelectors format
+    let selectedElements = [];    // Handle new elementSelectors format
     if (actualParams.elementSelectors) {
       console.log('elementSelectors received:', actualParams.elementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(actualParams.elementSelectors);
@@ -2090,6 +2459,9 @@ Current Styling:`;
     }
     
     try {
+      // Show progress feedback
+      this.showProgress('Gerando imagem com IA', 'processing');
+      
       // Call OpenAI API to generate image
       console.log('🎨 Generating image with prompt:', prompt);
       
@@ -2117,6 +2489,9 @@ Current Styling:`;
       const result = await response.json();
       console.log('✅ Image generated successfully:', result);
       
+      // Update progress
+      this.updateProgress('Processando imagem gerada', 'applying');
+      
       // Extract image URL from response
       let imageUrl;
       if (result.images && result.images.length > 0) {
@@ -2137,6 +2512,9 @@ Current Styling:`;
 
       // Apply the image based on the applyAs parameter
       if (applyAs === 'background' && elementSelectors.length > 0) {
+        // Update progress
+        this.updateProgress('Aplicando imagem como fundo', 'applying');
+        
         // Apply as background image to selected elements
         const elements = this.reconstructElementsFromSelectors(elementSelectors);
         
@@ -2175,8 +2553,9 @@ Current Styling:`;
         imgElement.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px;';
         
         // Insert into DOM
-        const insertionPoint = this.findInsertionPoint(elementSelectors);
-        insertionPoint.appendChild(imgElement);
+        const insertionMode = this.determineInsertionMode(description, elementSelectors);
+        const insertionInfo = this.findInsertionPoint(elementSelectors, insertionMode);
+        this.insertElementAtPoint(imgElement, insertionInfo);
         
         // Add visual indicator for new element
         this.addNewElementIndicator(imgElement);
@@ -2190,11 +2569,20 @@ Current Styling:`;
           imageUrl: imageUrl
         }, imgElement, `generateImage: ${description}`);
         
+        // Show success and hide progress
+        this.updateProgress('Imagem criada com sucesso!', 'success');
+        setTimeout(() => this.hideProgress(), 2000);
+        
         return `✅ Imagem gerada e elemento criado: ${description}. Nova imagem adicionada à página. URL: ${imageUrl}`;
       }
       
     } catch (error) {
       console.error('❌ Error generating image:', error);
+      
+      // Show error and hide progress
+      this.updateProgress(`Erro na geração: ${error.message}`, 'error');
+      setTimeout(() => this.hideProgress(), 3000);
+      
       return `Erro ao gerar imagem: ${error.message}`;
     }
   }
@@ -2257,6 +2645,30 @@ Current Styling:`;
       return 'Tasks parameter must be an array of task objects.';
     }
     
+    try {
+      // Use enhanced task planner if action is 'create'
+      if (action === 'create' && tasks.length > 0) {
+        // Try to infer command from task descriptions
+        const inferredCommand = tasks.map(t => t.description).join(' ');
+        const plan = this.taskPlanner.createIntelligentPlan(inferredCommand, {
+          elementSelectors: this.currentElementSelectors || []
+        });
+        
+        return this.formatPlanResponse(plan);
+      }
+      
+      // Fallback to original implementation for updates
+      return this._planTaskOriginal(params);
+      
+    } catch (error) {
+      console.error('Error in enhanced planTask:', error);
+      return `Erro ao gerenciar plano de tarefas: ${error.message}`;
+    }
+  }
+  
+  _planTaskOriginal(params) {
+    const { action, tasks } = params;
+    
     // Validate task format
     const validTasks = tasks.every(task => 
       task.description && 
@@ -2309,6 +2721,27 @@ Current Styling:`;
       console.error('Error in planTask:', error);
       return `Erro ao gerenciar plano de tarefas: ${error.message}`;
     }
+  }
+  
+  formatPlanResponse(plan) {
+    let response = `🎯 **${plan.name}**\n\n`;
+    response += `⏱️ Tempo estimado: ${Math.round(plan.estimatedTime / 1000)}s\n`;
+    response += `📊 Complexidade: ${plan.metadata.complexity}\n`;
+    response += `🎯 Risco: ${plan.metadata.riskLevel}\n\n`;
+    
+    response += `**Tarefas (${plan.totalTasks}):**\n`;
+    plan.subtasks.forEach((task, index) => {
+      const emoji = task.status === 'completed' ? '✅' : 
+                   task.status === 'in_progress' ? '🔄' : '⏳';
+      const time = Math.round(task.estimatedTime / 1000);
+      response += `${emoji} ${index + 1}. ${task.name} (~${time}s)\n`;
+      
+      if (task.dependencies && task.dependencies.length > 0) {
+        response += `   ↳ Depende de: ${task.dependencies.join(', ')}\n`;
+      }
+    });
+    
+    return response;
   }
 
   async planTaskWrapper(params) {

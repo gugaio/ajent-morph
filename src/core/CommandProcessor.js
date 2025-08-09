@@ -4,13 +4,22 @@ import { Squad } from 'ajent';
 import DOMManipulationAgent from '../agents/DOMManipulationAgent.js';
 
 class CommandProcessor {
-  constructor(apiToken = null) {
+  constructor(apiToken = null, chatInterface = null) {
     this.inspector = new ElementInspector();
     this.applier = new ResponseApplier();
+    this.chatInterface = chatInterface;
     
     // Initialize AI agent squad
     if (apiToken) {
       const agents = [new DOMManipulationAgent()];
+      
+      // Pass chat interface reference to agents for progress feedback
+      agents.forEach(agent => {
+        if (agent.setChatInterface) {
+          agent.setChatInterface(chatInterface);
+        }
+      });
+      
       this.squad = new Squad({
         agents,
         apiToken: apiToken

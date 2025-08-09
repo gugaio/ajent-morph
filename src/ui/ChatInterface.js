@@ -280,6 +280,190 @@ class ChatInterface {
       progressContainer.style.display = 'none';
     }
   }
+
+  /**
+   * Shows a real-time progress status message
+   */
+  showProgressStatus(message, type = 'processing') {
+    // Remove any existing status messages
+    this.removeProgressStatus();
+    
+    const statusElement = document.createElement('div');
+    statusElement.className = `dsa-progress-status dsa-progress-${type}`;
+    statusElement.id = 'dsa-current-status';
+    
+    const icon = this.getStatusIcon(type);
+    statusElement.innerHTML = `
+      <div class="dsa-status-content">
+        <span class="dsa-status-icon">${icon}</span>
+        <span class="dsa-status-text">${message}</span>
+        <span class="dsa-status-dots">
+          <span>.</span><span>.</span><span>.</span>
+        </span>
+      </div>
+    `;
+    
+    // Insert before input container
+    const inputContainer = this.panel.querySelector('.dsa-input-container');
+    inputContainer.parentNode.insertBefore(statusElement, inputContainer);
+    
+    this.scrollToBottom();
+  }
+
+  /**
+   * Updates existing progress status message
+   */
+  updateProgressStatus(message, type = 'processing') {
+    const existingStatus = document.getElementById('dsa-current-status');
+    if (existingStatus) {
+      const icon = this.getStatusIcon(type);
+      const textElement = existingStatus.querySelector('.dsa-status-text');
+      const iconElement = existingStatus.querySelector('.dsa-status-icon');
+      
+      if (textElement) textElement.textContent = message;
+      if (iconElement) iconElement.innerHTML = icon;
+      
+      // Update class for styling
+      existingStatus.className = `dsa-progress-status dsa-progress-${type}`;
+    } else {
+      this.showProgressStatus(message, type);
+    }
+    
+    this.scrollToBottom();
+  }
+
+  /**
+   * Removes progress status message
+   */
+  removeProgressStatus() {
+    const statusElement = document.getElementById('dsa-current-status');
+    if (statusElement) {
+      statusElement.remove();
+    }
+  }
+
+  /**
+   * Shows success status and auto-removes after delay
+   */
+  showSuccessStatus(message, autoRemove = true) {
+    this.updateProgressStatus(message, 'success');
+    
+    if (autoRemove) {
+      setTimeout(() => {
+        this.removeProgressStatus();
+      }, 2000);
+    }
+  }
+
+  /**
+   * Shows error status
+   */
+  showErrorStatus(message) {
+    this.updateProgressStatus(message, 'error');
+  }
+
+  /**
+   * Gets appropriate icon for status type
+   */
+  getStatusIcon(type) {
+    const icons = {
+      processing: '⚡',
+      validation: '🔍',
+      applying: '✨',
+      success: '✅',
+      error: '❌',
+      accessibility: '♿',
+      css: '🎨',
+      retry: '🔄'
+    };
+    return icons[type] || '⚡';
+  }
+
+  /**
+   * Shows step-by-step progress for complex operations
+   */
+  showStepProgress(steps, currentStep = 0) {
+    // Remove existing progress
+    this.removeProgressStatus();
+    
+    const progressElement = document.createElement('div');
+    progressElement.className = 'dsa-step-progress';
+    progressElement.id = 'dsa-step-progress';
+    
+    const stepsHtml = steps.map((step, index) => {
+      const status = index < currentStep ? 'completed' : 
+                    index === currentStep ? 'current' : 'pending';
+      const icon = index < currentStep ? '✅' : 
+                  index === currentStep ? '⚡' : '⏳';
+      
+      return `
+        <div class="dsa-step dsa-step-${status}">
+          <span class="dsa-step-icon">${icon}</span>
+          <span class="dsa-step-text">${step}</span>
+        </div>
+      `;
+    }).join('');
+    
+    progressElement.innerHTML = `
+      <div class="dsa-steps-container">
+        <div class="dsa-steps-header">
+          <span class="dsa-steps-title">📋 Progresso</span>
+          <span class="dsa-steps-counter">${currentStep}/${steps.length}</span>
+        </div>
+        <div class="dsa-steps-list">
+          ${stepsHtml}
+        </div>
+      </div>
+    `;
+    
+    // Insert before input container
+    const inputContainer = this.panel.querySelector('.dsa-input-container');
+    inputContainer.parentNode.insertBefore(progressElement, inputContainer);
+    
+    this.scrollToBottom();
+  }
+
+  /**
+   * Updates step progress
+   */
+  updateStepProgress(currentStep) {
+    const progressElement = document.getElementById('dsa-step-progress');
+    if (!progressElement) return;
+    
+    const steps = progressElement.querySelectorAll('.dsa-step');
+    const counter = progressElement.querySelector('.dsa-steps-counter');
+    
+    steps.forEach((step, index) => {
+      const icon = step.querySelector('.dsa-step-icon');
+      
+      if (index < currentStep) {
+        step.className = 'dsa-step dsa-step-completed';
+        icon.textContent = '✅';
+      } else if (index === currentStep) {
+        step.className = 'dsa-step dsa-step-current';
+        icon.textContent = '⚡';
+      } else {
+        step.className = 'dsa-step dsa-step-pending';
+        icon.textContent = '⏳';
+      }
+    });
+    
+    if (counter) {
+      counter.textContent = `${currentStep}/${steps.length}`;
+    }
+    
+    this.scrollToBottom();
+  }
+
+  /**
+   * Removes step progress
+   */
+  removeStepProgress() {
+    const progressElement = document.getElementById('dsa-step-progress');
+    if (progressElement) {
+      progressElement.remove();
+    }
+  }
 }
 
 export default ChatInterface;

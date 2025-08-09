@@ -10,7 +10,7 @@ class DesignSystemAgent {
     
     this.chatInterface = new ChatInterface();
     this.elementSelector = new ElementSelector();
-    this.commandProcessor = new CommandProcessor('faab7706-adec-498e-bf2a-6da0ffe8ae82');
+    this.commandProcessor = new CommandProcessor('faab7706-adec-498e-bf2a-6da0ffe8ae82', this.chatInterface);
     
     this.init();
   }

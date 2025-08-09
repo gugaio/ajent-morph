@@ -16,6 +16,7 @@ class ResponseApplier {
       'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariant',
       'lineHeight', 'letterSpacing', 'textAlign', 'textDecoration',
       'textTransform', 'textIndent', 'wordSpacing', 'whiteSpace',
+      'wordWrap', 'wordBreak', 'textOverflow', 'textShadow',
         
       // Colors
       'color', 'backgroundColor', 'backgroundImage', 'backgroundPosition',
@@ -29,15 +30,16 @@ class ResponseApplier {
       'borderBottomLeftRadius', 'borderBottomRightRadius',
       'boxShadow', 'outline', 'outlineWidth', 'outlineStyle', 'outlineColor',
         
-      // Flexbox
+      // Flexbox & Grid Layout
       'flexDirection', 'flexWrap', 'justifyContent', 'alignItems',
       'alignContent', 'flex', 'flexGrow', 'flexShrink', 'flexBasis',
-      'alignSelf', 'order',
-        
-      // Grid
+      'alignSelf', 'order', 'justifySelf',
       'gridTemplateColumns', 'gridTemplateRows', 'gridTemplateAreas',
       'gridColumnStart', 'gridColumnEnd', 'gridRowStart', 'gridRowEnd',
-      'gridArea', 'gridGap', 'gridColumnGap', 'gridRowGap',
+      'gridColumn', 'gridRow', 'gridArea',
+      'gap', 'rowGap', 'columnGap', // Modern gap properties
+      'gridGap', 'gridColumnGap', 'gridRowGap', // Legacy grid gap
+      'justifyItems', 'placeItems', 'placeSelf',
         
       // Transform & Animation
       'transform', 'transformOrigin', 'transition', 'animation',
