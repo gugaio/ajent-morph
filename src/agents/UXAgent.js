@@ -8,8 +8,8 @@ class UXAgent extends Agent {
     // Initialize ResponseApplier for applying styles and maintaining history
     this.applier = new ResponseApplier();
 
-    this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', (params) => this.applyStylesWrapper(params)));
-    this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', (params) => this.generateImageWrapper(params)));
+    this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', ({ description, styles, elementSelectors }) => this.applyStylesWrapper({ description, styles, elementSelectors })));
+    this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', ({ description, prompt, elementSelectors, applyAs }) => this.generateImageWrapper({description, prompt, elementSelectors, applyAs})));
     this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
   }
 
@@ -170,15 +170,11 @@ class UXAgent extends Agent {
         return 'No changes made yet. Make some modifications first before requesting instructions.';
       }
       
-      // Process history to find temporary image URLs and create download instructions
-      const processedHistory = await this.processImageUrlsInHistory(history);
-      
       // Return processed history data as JSON string for LLM to analyze
       const historyData = {
-        changeHistory: processedHistory.history,
-        totalChanges: processedHistory.history.length,
-        imageDownloads: processedHistory.imageDownloads,
-        message: `Raw change history with ${processedHistory.history.length} modifications ready for Claude Code instruction generation.`
+        changeHistory: history,
+        totalChanges: history.length,
+        message: `Raw change history with ${history.length} modifications ready for Claude Code instruction generation.`
       };
       
       return JSON.stringify(historyData, null, 2);
@@ -186,6 +182,184 @@ class UXAgent extends Agent {
     } catch (error) {
       console.error('Error getting change history:', error);
       return `Failed to get change history: ${error.message}`;
+    }
+  }
+
+
+  async generateImageWrapper(params) {
+    console.log('generateImageWrapper called with params:', params);
+    
+    if (!params) {
+      throw new Error('Description and prompt parameters are required');
+    }
+    
+    // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
+    let actualParams = params;
+    if (params.params && typeof params.params === 'string') {
+      try {
+        actualParams = JSON.parse(params.params);
+        console.log('Parsed actualParams for generateImage:', actualParams);
+      } catch (error) {
+        console.warn('Failed to parse params.params:', error);
+        actualParams = params;
+      }
+    }
+    
+    let elementSelectors = [];
+    
+    // Handle elementSelectors
+    if (actualParams.elementSelectors) {
+      elementSelectors = actualParams.elementSelectors;
+    }
+    // Handle case where selectors come from currentElementSelectors
+    else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
+      elementSelectors = this.currentElementSelectors;
+    }
+    
+    // Validate required parameters
+    if (!actualParams.description) {
+      throw new Error('Description parameter is required');
+    }
+    
+    if (!actualParams.prompt || !actualParams.prompt.trim()) {
+      throw new Error('Prompt parameter is required for image generation');
+    }
+    
+    return this.generateImage({
+      description: actualParams.description,
+      prompt: actualParams.prompt,
+      elementSelectors: elementSelectors,
+      applyAs: actualParams.applyAs || 'background'
+    });
+  }
+
+  async generateImage(params) {
+    const { description, prompt, elementSelectors = [], applyAs = 'background' } = params;
+    
+    if (!description) {
+      return 'Descrição é obrigatória para gerar imagem.';
+    }
+    
+    if (!prompt || !prompt.trim()) {
+      return 'Prompt é obrigatório para gerar imagem.';
+    }
+    
+    try {
+      
+      // Call OpenAI API to generate image
+      console.log('🎨 Generating image with prompt:', prompt);
+      
+      //const url = 'https://spinal.onrender.com/text-to-image';
+      const url = 'http://localhost:5000/text-to-image';
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Token': 'faab7706-adec-498e-bf2a-6da0ffe8ae82'
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          model: 'dall-e-3',
+          size: '1024x1024',
+          quality: 'standard',
+          n: 1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Image generated successfully:', result);
+      
+      
+      // Extract image URL from response
+      let imageUrl;
+      if (result.images && result.images.length > 0) {
+        // Handle the actual API response format: {images: ['url1', 'url2']}
+        imageUrl = result.images[0];
+      } else if (result.data && result.data.length > 0 && result.data[0].url) {
+        // Handle OpenAI standard format (fallback)
+        imageUrl = result.data[0].url;
+      } else if (result.url) {
+        // Handle direct URL format (fallback)
+        imageUrl = result.url;
+      } else {
+        console.error('Unexpected API response format:', result);
+        throw new Error('No image URL found in API response');
+      }
+
+      console.log('🖼️ Image URL:', imageUrl);
+
+      // Apply the image based on the applyAs parameter
+      if (applyAs === 'background' && elementSelectors.length > 0) {
+        
+        // Apply as background image to selected elements
+        const elements = this.reconstructElementsFromSelectors(elementSelectors);
+        
+        if (elements.length === 0) {
+          return `❌ Nenhum elemento encontrado com os seletores fornecidos: ${elementSelectors.join(', ')}.`;
+        }
+
+        let successCount = 0;
+        for (const element of elements) {
+          try {
+            // Apply background image
+            await this.applier.applyLLMResponse({
+              action: 'apply_background_image',
+              explanation: `Imagem de fundo aplicada: ${description}`,
+              styles: {
+                backgroundImage: `url(${imageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }
+            }, element, `generateImage: ${description}`);
+            
+            successCount++;
+          } catch (error) {
+            console.error('Error applying background image:', error);
+          }
+        }
+
+        return `✅ Imagem gerada e aplicada como fundo: ${description}. Background aplicado em ${successCount} elemento(s). URL: ${imageUrl}`;
+        
+      } else {
+        // Create new img element
+        const imgElement = document.createElement('img');
+        imgElement.src = imageUrl;
+        imgElement.alt = description;
+        imgElement.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px;';
+        
+        // Insert into DOM
+        const insertionMode = this.determineInsertionMode(description, elementSelectors);
+        const insertionInfo = this.findInsertionPoint(elementSelectors, insertionMode);
+        this.insertElementAtPoint(imgElement, insertionInfo);
+        
+        // Add visual indicator for new element
+        this.addNewElementIndicator(imgElement);
+        
+        // Track in history
+        await this.applier.applyLLMResponse({
+          action: 'create_image_element',
+          explanation: `Elemento de imagem criado: ${description}`,
+          styles: {},
+          html: imgElement.outerHTML,
+          imageUrl: imageUrl
+        }, imgElement, `generateImage: ${description}`);
+        
+        return `✅ Imagem gerada e elemento criado: ${description}. Nova imagem adicionada à página. URL: ${imageUrl}`;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error generating image:', error);
+      
+      // Show error and hide progress
+      this.updateProgress(`Erro na geração: ${error.message}`, 'error');
+      setTimeout(() => this.hideProgress(), 3000);
+      
+      return `Erro ao gerar imagem: ${error.message}`;
     }
   }
 
