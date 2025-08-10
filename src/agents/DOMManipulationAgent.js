@@ -139,7 +139,7 @@ User: "Crie um formulário de contato completo"
 ### 🔍 INFORMATION REQUESTS (NO TOOLS NEEDED)
 **When:** User wants to know about current element properties/styles
 **Examples:** "me detalha a cor de fundo", "qual a cor atual?", "que tamanho tem?", "mostra os estilos", "analyze this element"
-**Action:** ❌ DO NOT call any tools! Use the element data already provided in the prompt to answer with final_answer
+**Action:** ❌ DO NOT call any tools! Use the element data already provided in the prompt to answer directly
 
 ### 🛠️ ACTION REQUESTS (USE TOOLS)
 
@@ -206,7 +206,7 @@ User: "Crie um formulário de contato completo"
 - Read the element data from the user prompt (includes computedStyles field)
 - Check the computedStyles object for current CSS values (backgroundColor, color, etc.)
 - Analyze the provided information thoroughly
-- Respond directly with final_answer tool with detailed, accurate information
+- Respond directly with detailed, accurate information (no tools needed)
 
 ## TOOL CALLING PATTERNS
 
@@ -438,11 +438,16 @@ The tools will return structured responses. Present them to the user in a clear,
 ### Example 0: Information Request (NO TOOLS)
 **User:** "qual a cor de fundo desse elemento"
 **Your response:**
-\`\`\`javascript
-final_answer({
-  "response": "🎨 Analisando o elemento selecionado (.activation-hint):\n\n**Cor de fundo:** #eff6ff (azul claro)\n**Outras propriedades visuais:**\n- Padding: 24px (1.5rem)\n- Border-radius: 12px (bordas arredondadas)\n- Box-shadow: sombra sutil\n- Text-align: center\n\nEste elemento tem um fundo azul claro bem suave, ideal para destacar informações importantes."
-})
-\`\`\`
+"🎨 Analisando o elemento selecionado (.activation-hint):
+
+**Cor de fundo:** #eff6ff (azul claro)
+**Outras propriedades visuais:**
+- Padding: 24px (1.5rem)
+- Border-radius: 12px (bordas arredondadas)
+- Box-shadow: sombra sutil
+- Text-align: center
+
+Este elemento tem um fundo azul claro bem suave, ideal para destacar informações importantes."
 
 **IMPORTANT:** Always check the computedStyles field in the element data to get accurate style information!
 
@@ -613,7 +618,7 @@ generateClaudeCodeInstructions()
 3. For each change, use elementContext.uniqueSelector for specific targeting
 4. If imageDownloads exist, create download and file organization instructions
 5. Create comprehensive, actionable instructions for Claude Code IDE with precise selectors
-6. Use final_answer with the formatted instructions as a string
+6. Return the formatted instructions as a string response
 
 **Example of improved instruction generation:**
 Instead of: "Alterar estilo do texto para itálico no elemento <p>"
@@ -679,35 +684,44 @@ Consider accessibility in your style suggestions:
 - Use semantic color choices
 - Ensure responsive behavior
 
-## IMPORTANT: FINAL ANSWER REQUIREMENT
+## CRITICAL: CONVERSATION COMPLETION RULES
 
-**CRITICAL:** After completing any DOM manipulation task (applyStyles, createElement, or deleteElement), you MUST use the "final_answer" tool to indicate that you have completed your task or reasoning and are returning a final response to the user.
+**CRITICAL FOR CLAUDE:** After executing ANY tool (applyStyles, createElement, deleteElement, etc.), you MUST immediately stop and provide a final text response. DO NOT call additional tools or continue the conversation.
 
-### Workflow Pattern:
-1. 🎯 **Identify Intent**: Analyze user command (modify, create, delete, generate image, or Claude Code instructions)
-2. 🔧 **Execute Tool**: Call appropriate tool (applyStyles, createElement, deleteElement, generateImage, generateClaudeCodeInstructions)
-3. 📊 **Process Results**: For Claude Code instructions, analyze the returned changeHistory object; for images, confirm generation and application
-4. ✅ **Provide Final Answer**: Use final_answer tool with formatted instructions or summary
+**WORKFLOW - EXECUTE ONCE AND STOP:**
+1. 🎯 **Identify Intent**: Analyze user command
+2. 🔧 **Execute ONE Tool**: Call the appropriate tool ONCE
+3. 🛑 **STOP IMMEDIATELY**: Do not call any more tools
+4. ✅ **Provide Final Response**: Return a clear text response describing what was accomplished
 
-### Example Final Answer Usage:
+**CRITICAL RULE: ONE TOOL CALL ONLY**
+- ✅ CORRECT: applyStyles() → "Color changed to blue successfully!"
+- ❌ WRONG: applyStyles() → applyStyles() → continues indefinitely
+- ✅ CORRECT: createElement() → "New button created successfully!"
+- ❌ WRONG: createElement() → addBehavior() → continues calling tools
+
+### Example Response Usage:
 After calling applyStyles tool:
-\`\`\`
-final_answer({
-  "response": "✅ Cor do texto alterada para vermelho com sucesso! O elemento agora possui a cor vermelha aplicada."
-})
-\`\`\`
+"✅ Cor do texto alterada para vermelho com sucesso! O elemento agora possui a cor vermelha aplicada."
 
 After calling generateClaudeCodeInstructions tool:
-\`\`\`
-final_answer({
-  "response": "🎯 **Instruções para Claude Code IDE:**\\n\\n## Modificações CSS\\n1. Alterar cor do texto para azul no elemento .button\\n   - color: blue\\n\\n## Elementos Criados\\n1. Novo botão com HTML: <button>Click Me</button>\\n\\n## Implementação\\n- Adicione as modificações CSS ao arquivo de estilos\\n- Integre novos elementos nos templates apropriados"
-})
-\`\`\`
+"🎯 **Instruções para Claude Code IDE:**
+
+## Modificações CSS
+1. Alterar cor do texto para azul no elemento .button
+   - color: blue
+
+## Elementos Criados
+1. Novo botão com HTML: <button>Click Me</button>
+
+## Implementação
+- Adicione as modificações CSS ao arquivo de estilos
+- Integre novos elementos nos templates apropriados"
 
 **Remember:** 
 - Your role is to understand user intent and call the appropriate tools with the correct, structured parameters
 - The tools handle the technical implementation
-- Always conclude with final_answer to provide clear feedback to the user`;
+- Always provide clear feedback about what was accomplished`;
   };
 
   async analyzeElement(params) {
@@ -2014,6 +2028,17 @@ Current Styling:`;
   async applyStylesWrapper(params) {
     console.log('applyStylesWrapper called with params:', params);
     
+    // Dispatch tool start event for UI feedback
+    const toolInfo = {
+      tool: 'applyStyles',
+      description: params?.description || 'Aplicando modificações de estilo',
+      target: params?.elementSelectors?.join(', ') || 'elementos selecionados'
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajentToolStart', { detail: toolInfo }));
+    }
+    
     if (!params) {
       throw new Error('Description, styles, and elementSelectors parameters are required');
     }
@@ -2060,11 +2085,36 @@ Current Styling:`;
     }
     
     // Call the main applyStyles method with reconstructed elements
-    return this.applyStyles({
-      description: actualParams.description,
-      styles: actualParams.styles,
-      selectedElements: selectedElements
-    });
+    try {
+      const result = await this.applyStyles({
+        description: actualParams.description,
+        styles: actualParams.styles,
+        selectedElements: selectedElements
+      });
+      
+      // Dispatch success event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ajentToolSuccess', {
+          detail: {
+            tool: 'applyStyles',
+            result: result
+          }
+        }));
+      }
+      
+      return result;
+    } catch (error) {
+      // Dispatch error event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('ajentToolError', {
+          detail: {
+            tool: 'applyStyles',
+            error: error.message
+          }
+        }));
+      }
+      throw error;
+    }
   }
 
   async validateStylesWrapper(params) {
@@ -2098,6 +2148,17 @@ Current Styling:`;
 
   async createElementWrapper(params) {
     console.log('createElementWrapper called with params:', params);
+    
+    // Dispatch tool start event for UI feedback
+    const toolInfo = {
+      tool: 'createElement',
+      description: params?.description || 'Criando novo elemento',
+      target: params?.elementSelectors?.length > 0 ? `próximo a ${params.elementSelectors.join(', ')}` : 'na página'
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajentToolStart', { detail: toolInfo }));
+    }
     
     if (!params) {
       throw new Error('Description parameter is required');
@@ -2134,13 +2195,38 @@ Current Styling:`;
     
     // Handle object format
     if (typeof params === 'object' && params.description) {
-      return this.createElement({
-        description: params.description,
-        html: params.html || null,
-        css: params.css || null,
-        selectedElements: selectedElements,
-        insertionMode: params.insertionMode || null
-      });
+      try {
+        const result = await this.createElement({
+          description: params.description,
+          html: params.html || null,
+          css: params.css || null,
+          selectedElements: selectedElements,
+          insertionMode: params.insertionMode || null
+        });
+        
+        // Dispatch success event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ajentToolSuccess', {
+            detail: {
+              tool: 'createElement',
+              result: result
+            }
+          }));
+        }
+        
+        return result;
+      } catch (error) {
+        // Dispatch error event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ajentToolError', {
+            detail: {
+              tool: 'createElement',
+              error: error.message
+            }
+          }));
+        }
+        throw error;
+      }
     }
     
     throw new Error('Invalid format. Expected: {"description": "what_to_create", "html": "<element>", "css": "styles", "elementSelectors": []}');

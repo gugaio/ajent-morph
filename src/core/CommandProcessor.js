@@ -1,7 +1,7 @@
 import ElementInspector from './ElementInspector';
 import ResponseApplier from './ResponseApplier';
 import { Squad } from 'ajent';
-import DOMManipulationAgent from '../agents/DOMManipulationAgent.js';
+import UXAgent from '../agents/UXAgent.js';
 
 class CommandProcessor {
   constructor(apiToken = null, chatInterface = null) {
@@ -11,7 +11,7 @@ class CommandProcessor {
     
     // Initialize AI agent squad
     if (apiToken) {
-      const agents = [new DOMManipulationAgent()];
+      const agents = [new UXAgent()];
       
       // Pass chat interface reference to agents for progress feedback
       agents.forEach(agent => {
@@ -22,7 +22,8 @@ class CommandProcessor {
       
       this.squad = new Squad({
         agents,
-        apiToken: apiToken
+        apiToken: apiToken,
+        apiUrl: 'http://localhost:5000'
       });
       //apiUrl: 'http://localhost:5000'
       this.hasAI = true;
@@ -62,14 +63,7 @@ class CommandProcessor {
       const contextPrompt = this.inspector.generateContextPrompt(firstElement, message);
       
       // Tenta chamar LLM primeiro
-      let llmResponse;
-      try {
-        llmResponse = await this.callLLM(contextPrompt);
-      } catch (error) {
-        console.warn('LLM call failed, using local fallback:', error.message);
-        // Fallback para sistema local
-        return await this.createLocalFallbackResponse(message, firstElement);
-      }
+      let llmResponse = await this.callLLM(contextPrompt);
       // Aplica resposta da LLM
       const result = await this.applier.applyLLMResponse(
         llmResponse, 
@@ -159,10 +153,6 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
   }
   
   async callLLM(prompt) {
-    if (!this.hasAI || !this.squad) {
-      throw new Error('AI agent not configured - API token required');
-    }
-
     try {
       // Use the AI agent squad to process the request
       const response = await this.squad.send(prompt);
@@ -174,23 +164,7 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
       throw new Error(`AI processing failed: ${error.message}`);
     }
   }
-  
-  // Método para configurar API token após instanciação
-  setApiToken(apiToken) {
-    if (apiToken) {
-      const agents = [new DOMManipulationAgent()];
-      this.squad = new Squad({
-        agents,
-        apiToken: apiToken,
 
-      });
-      this.hasAI = true;
-    } else {
-      this.squad = null;
-      this.hasAI = false;
-    }
-  }
-  
   async processIntelligentDecision(message, elements) {
     // Special case: Claude Code instructions don't require selected elements
     const isClaudeCodeRequest = message.toLowerCase().includes('claude code') || 
@@ -204,11 +178,6 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         success: false,
         noElementsSelected: true
       };
-    }
-
-    if (!this.squad) {
-      // Fallback to local processing if no LLM available
-      return await this.createLocalFallbackResponse(message, elements[0]);
     }
 
     try {
@@ -225,69 +194,23 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         }
         return element.tagName.toLowerCase();
       }).filter(Boolean);
-
-      // Check if this is a complex command that should trigger automatic task planning
-      const isComplexCommand = this.detectComplexCommand(message);
       
       // Create a context-rich prompt for the LLM that includes element information and selectors
       let contextPrompt = `User command: "${message}"\n\n`;
       
-      if (isComplexCommand) {
-        contextPrompt += `COMPLEX COMMAND DETECTED: This appears to be a multi-step operation.\n`;
-        contextPrompt += `REQUIRED: Call planTask tool FIRST to break down this task into manageable steps, then execute each step.\n\n`;
-      }
-      
       if (isClaudeCodeRequest) {
-        contextPrompt += `SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n`;
-        contextPrompt += `No elements need to be selected for this request - it works with stored change history only.\n\n`;
+        contextPrompt += 'SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n';
+        contextPrompt += 'No elements need to be selected for this request - it works with stored change history only.\n\n';
       } else if (elements && elements.length > 0) {
-        contextPrompt += `Selected elements (these will be passed to tools as elementSelectors parameter):\n`;
+        contextPrompt += 'Selected elements (these will be passed to tools as elementSelectors parameter):\n';
         elements.forEach((element, index) => {
           const elementInfo = this.inspector.getElementInfo(element);
           const selector = elementSelectors[index];
           contextPrompt += `Element ${index + 1} (selector: ${selector}): ${JSON.stringify(elementInfo, null, 2)}\n`;
         });
       } else {
-        contextPrompt += `No elements selected.\n`;
+        contextPrompt += 'No elements selected.\n';
       }
-      
-      contextPrompt += `\nPlease analyze this command and call the appropriate tool:
-
-1. **For CSS modifications:** Call applyStyles tool with:
-   - description: clear description of visual change
-   - styles: CSS property-value pairs
-   - elementSelectors: array of CSS selectors for target elements
-
-2. **For element creation:** Call createElement tool with:
-   - description: what to create  
-   - elementSelectors: selectors for reference elements (can be empty)
-
-3. **For interactive element creation:** Call createInteractiveElement tool with:
-   - description: what to create
-   - html: complete HTML code
-   - css: styling
-   - javascript: behavior code
-   - elementSelectors: reference elements (can be empty)
-
-4. **For adding behavior:** Call addBehavior tool with:
-   - description: behavior to add
-   - elementSelectors: target elements
-   - events: event handlers object
-
-5. **For script execution:** Call executeScript tool with:
-   - description: what script does
-   - code: JavaScript code
-   - context: execution context
-
-6. **For element deletion:** Call deleteElement tool with:
-   - elementSelectors: selectors for elements to delete
-   - confirmation: true
-
-7. **For Claude Code instructions:** Call generateClaudeCodeInstructions tool with:
-   - requestType: "claude_code_instructions"
-   - NOTE: This tool works with change history only - no elements needed
-
-The element selectors will be used to reconstruct the DOM elements within the tools.`;
 
       console.log('Sending intelligent decision prompt to LLM:', contextPrompt);
 
@@ -295,6 +218,8 @@ The element selectors will be used to reconstruct the DOM elements within the to
       if (this.squad && this.squad.agents && this.squad.agents[0]) {
         this.squad.agents[0].currentElementSelectors = elementSelectors;
         this.squad.agents[0].currentSelectedElements = elements; // Keep as backup
+        
+        // Tool progress events are now handled directly in the agent wrappers
       }
 
       // Use the LLM squad to process the intelligent decision
@@ -330,66 +255,106 @@ The element selectors will be used to reconstruct the DOM elements within the to
     }
   }
 
-  async createLocalFallbackResponse(message, element) {
-    // Simple local fallback when LLM is not available
-    if (!element) {
-      return {
-        message: 'Por favor, selecione um elemento na página antes de executar comandos! 👆',
-        success: false,
-        noElementsSelected: true
-      };
-    }
-    
-    return {
-      message: `Comando "${message}" foi recebido, mas o sistema de IA não está disponível. Por favor, tente novamente ou verifique a configuração da API.`,
-      success: false,
-      fallback: true
-    };
-  }
-
-  // Detect if a command is complex and should trigger automatic task planning
-  detectComplexCommand(message) {
-    const lowerMessage = message.toLowerCase();
-    
-    // Keywords that indicate complex operations
-    const complexKeywords = [
-      'completo', 'sistema', 'dashboard', 'formulário', 'navegação', 
-      'página', 'website', 'aplicação', 'modal', 'carousel', 'slider',
-      'login', 'registro', 'cadastro', 'checkout', 'carrinho',
-      'dark mode', 'responsivo', 'landing', 'portfolio', 'blog'
-    ];
-    
-    // Multi-component phrases
-    const multiComponentPhrases = [
-      'com validação', 'com envio', 'com menu', 'com logo', 
-      'com botões', 'com campos', 'com animação', 'interativo',
-      'funcional', 'dinâmico'
-    ];
-    
-    // Check for complex keywords
-    const hasComplexKeyword = complexKeywords.some(keyword => 
-      lowerMessage.includes(keyword)
-    );
-    
-    // Check for multi-component indicators
-    const hasMultiComponent = multiComponentPhrases.some(phrase => 
-      lowerMessage.includes(phrase)
-    );
-    
-    // Check for transformation requests
-    const isTransformation = lowerMessage.includes('transforme') || 
-                           lowerMessage.includes('converta') ||
-                           lowerMessage.includes('mude para') ||
-                           lowerMessage.includes('faça');
-    
-    // Consider it complex if it has multiple indicators or specific patterns
-    return hasComplexKeyword || hasMultiComponent || 
-           (isTransformation && lowerMessage.split(' ').length > 4);
-  }
 
   // Verifica se AI está disponível
   isAIAvailable() {
     return this.hasAI && this.squad !== null;
+  }
+
+  setupToolProgressListeners(agent) {
+    // Store original methods to add progress tracking
+    const originalMethods = {};
+    const toolNames = ['applyStyles', 'createElement', 'createInteractiveElement', 'deleteElement', 'addBehavior', 'executeScript', 'generateImage', 'planTask'];
+    
+    toolNames.forEach(toolName => {
+      const wrapperMethod = `${toolName}Wrapper`;
+      if (agent[wrapperMethod] && typeof agent[wrapperMethod] === 'function') {
+        // Store original method
+        originalMethods[wrapperMethod] = agent[wrapperMethod].bind(agent);
+        
+        // Override with progress tracking
+        agent[wrapperMethod] = async (params) => {
+          // Extract meaningful information for progress display
+          const toolInfo = this.extractToolInfo(toolName, params);
+          
+          // Dispatch start event
+          window.dispatchEvent(new CustomEvent('ajentToolStart', { detail: toolInfo }));
+          
+          try {
+            // Call original method
+            const result = await originalMethods[wrapperMethod](params);
+            
+            // Dispatch success event
+            window.dispatchEvent(new CustomEvent('ajentToolSuccess', { 
+              detail: { 
+                tool: toolName,
+                result: typeof result === 'string' ? result : result.message || 'Operação concluída',
+                fullResult: result
+              }
+            }));
+            
+            return result;
+          } catch (error) {
+            // Dispatch error event
+            window.dispatchEvent(new CustomEvent('ajentToolError', {
+              detail: {
+                tool: toolName,
+                error: error.message
+              }
+            }));
+            throw error;
+          }
+        };
+      }
+    });
+  }
+
+  extractToolInfo(toolName, params) {
+    const toolInfo = {
+      tool: toolName,
+      description: '',
+      target: ''
+    };
+    
+    switch (toolName) {
+    case 'applyStyles':
+      toolInfo.description = params?.description || 'Aplicando modificações de estilo';
+      toolInfo.target = params?.elementSelectors?.join(', ') || 'elementos selecionados';
+      break;
+    case 'createElement':
+      toolInfo.description = params?.description || 'Criando novo elemento';
+      toolInfo.target = params?.elementSelectors?.length > 0 ? `próximo a ${params.elementSelectors.join(', ')}` : 'na página';
+      break;
+    case 'createInteractiveElement':
+      toolInfo.description = params?.description || 'Criando elemento interativo';
+      toolInfo.target = params?.elementSelectors?.length > 0 ? `próximo a ${params.elementSelectors.join(', ')}` : 'na página';
+      break;
+    case 'deleteElement':
+      toolInfo.description = 'Removendo elementos da página';
+      toolInfo.target = params?.elementSelectors?.join(', ') || 'elementos selecionados';
+      break;
+    case 'addBehavior':
+      toolInfo.description = params?.description || 'Adicionando comportamento JavaScript';
+      toolInfo.target = params?.elementSelectors?.join(', ') || 'elementos selecionados';
+      break;
+    case 'executeScript':
+      toolInfo.description = params?.description || 'Executando código JavaScript';
+      toolInfo.target = 'contexto global';
+      break;
+    case 'generateImage':
+      toolInfo.description = params?.description || 'Gerando imagem com IA';
+      toolInfo.target = params?.elementSelectors?.length > 0 ? params.elementSelectors.join(', ') : 'novo elemento';
+      break;
+    case 'planTask':
+      toolInfo.description = params?.action === 'create' ? 'Criando plano de tarefas' : 'Atualizando progresso das tarefas';
+      toolInfo.target = `${params?.tasks?.length || 0} tarefas`;
+      break;
+    default:
+      toolInfo.description = 'Executando operação';
+      toolInfo.target = 'elementos da página';
+    }
+    
+    return toolInfo;
   }
 }
 

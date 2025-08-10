@@ -168,6 +168,96 @@ class ChatInterface {
       typingEl.remove();
     }
   }
+
+  showToolProgress(toolInfo) {
+    // Remove existing progress indicators
+    this.hideTyping();
+    this.hideToolProgress();
+    
+    const progressEl = document.createElement('div');
+    progressEl.className = 'dsa-tool-progress';
+    progressEl.innerHTML = `
+      <div class="dsa-tool-header">
+        <span class="dsa-tool-icon">${this.getToolIcon(toolInfo.tool)}</span>
+        <span class="dsa-tool-name">${this.getToolDisplayName(toolInfo.tool)}</span>
+        <div class="dsa-progress-spinner"></div>
+      </div>
+      <div class="dsa-tool-description">${toolInfo.description}</div>
+      ${toolInfo.target ? `<div class="dsa-tool-target">🎯 Alvo: ${toolInfo.target}</div>` : ''}
+    `;
+    
+    this.messagesContainer.appendChild(progressEl);
+    this.scrollToBottom();
+  }
+
+  hideToolProgress() {
+    const progressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+    if (progressEl) {
+      progressEl.remove();
+    }
+  }
+
+  updateToolProgress(status, message) {
+    const progressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+    if (progressEl) {
+      const statusEl = document.createElement('div');
+      statusEl.className = `dsa-tool-status dsa-tool-${status}`;
+      statusEl.innerHTML = `
+        <span class="dsa-status-icon">${status === 'success' ? '✅' : status === 'error' ? '❌' : '⚠️'}</span>
+        <span class="dsa-status-message">${message}</span>
+      `;
+      progressEl.appendChild(statusEl);
+      
+      // Remove spinner
+      const spinner = progressEl.querySelector('.dsa-progress-spinner');
+      if (spinner) {
+        spinner.remove();
+      }
+      
+      this.scrollToBottom();
+      
+      // Auto-hide after 3 seconds for successful operations
+      if (status === 'success') {
+        setTimeout(() => {
+          const currentProgressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+          if (currentProgressEl === progressEl) {
+            progressEl.style.opacity = '0.6';
+            progressEl.style.transform = 'scale(0.95)';
+          }
+        }, 3000);
+      }
+    }
+  }
+
+  getToolIcon(toolName) {
+    const icons = {
+      'applyStyles': '🎨',
+      'createElement': '➕',
+      'createInteractiveElement': '⚡',
+      'deleteElement': '🗑️',
+      'addBehavior': '🔧',
+      'executeScript': '💻',
+      'generateImage': '🖼️',
+      'generateClaudeCodeInstructions': '📋',
+      'planTask': '🎯'
+    };
+    return icons[toolName] || '🔧';
+  }
+
+  getToolDisplayName(toolName) {
+    const names = {
+      'applyStyles': 'Aplicar Estilos',
+      'createElement': 'Criar Elemento',
+      'createInteractiveElement': 'Criar Elemento Interativo',
+      'deleteElement': 'Remover Elemento',
+      'addBehavior': 'Adicionar Comportamento',
+      'executeScript': 'Executar Script',
+      'generateImage': 'Gerar Imagem',
+      'generateClaudeCodeInstructions': 'Gerar Instruções IDE',
+      'planTask': 'Planejar Tarefas'
+    };
+    return names[toolName] || 'Executar Ferramenta';
+  }
   
   scrollToBottom() {
     this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
@@ -217,6 +307,22 @@ class ChatInterface {
     // Listen for task plan updates from the DOMManipulationAgent
     window.addEventListener('ajentTaskPlanUpdate', (event) => {
       this.updateTaskProgress(event.detail);
+    });
+
+    // Listen for tool progress events
+    window.addEventListener('ajentToolStart', (event) => {
+      console.log('🚀 Tool started:', event.detail);
+      this.showToolProgress(event.detail);
+    });
+
+    window.addEventListener('ajentToolSuccess', (event) => {
+      console.log('✅ Tool success:', event.detail);
+      this.updateToolProgress('success', event.detail.result);
+    });
+
+    window.addEventListener('ajentToolError', (event) => {
+      console.log('❌ Tool error:', event.detail);
+      this.updateToolProgress('error', `Erro: ${event.detail.error}`);
     });
   }
 

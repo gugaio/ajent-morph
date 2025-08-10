@@ -147,6 +147,14 @@ class DesignSystemAgent {
       result = await this.commandProcessor.process(message, {
         selectedElements: selectedElements,
         mode: 'intelligent_decision'
+      }, (llmResponse) => {
+        // Show typing indicator during processing
+        this.chatInterface.addMessage(
+          {
+            type: 'agent',
+            content: llmResponse.message || 'Processando...'
+          }
+        );
       });
       
       // Hide typing
