@@ -24,22 +24,28 @@
             padding: 0 2rem;
         }
 
-        /* Header */
+        /* Header translúcido com blur */
         header {
             position: fixed;
             top: 0;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            left: 0;
+            right: 0;
             z-index: 1000;
-            border-bottom: 1px solid #e5e7eb;
+            background-color: rgba(255, 255, 255, 0.6);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(229, 231, 235, 1);
+            transition: background-color 0.2s ease, backdrop-filter 0.2s ease;
         }
 
+        /* Garantir que o nav não tenha cor de fundo própria */
         nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 1rem 2rem;
+            background-color: transparent !important;
+            backdrop-filter: none !important;
         }
 
         .logo {
