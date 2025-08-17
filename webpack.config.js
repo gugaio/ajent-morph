@@ -19,8 +19,8 @@ module.exports = (env, argv) => {
     entry: './src/index.js',
     output: {
       path: path.resolve(__dirname, 'dist'),
-      filename: isProduction ? 'design-system-agent.min.js' : 'design-system-agent.js',
-      library: 'DesignSystemAgent',
+      filename: isProduction ? 'frontable.min.js' : 'frontable.js',
+      library: 'Frontable',
       libraryTarget: 'umd',
       globalObject: 'this',
       clean: true
@@ -63,7 +63,7 @@ module.exports = (env, argv) => {
     plugins: [
       ...(isProduction ? [
         new MiniCssExtractPlugin({
-          filename: 'design-system-agent.css'
+          filename: 'frontable.css'
         })
       ] : []),
       new HtmlWebpackPlugin({

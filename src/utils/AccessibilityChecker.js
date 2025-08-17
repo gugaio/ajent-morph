@@ -5,6 +5,33 @@
  * Oferece sugestões automáticas para melhorar acessibilidade
  */
 class AccessibilityChecker {
+  /*...*/
+
+  /**
+   * Verifica acessibilidade de imagens em Base64
+   */
+  checkImageAccessibility(imageBase64) {
+    const report = this.generateAccessibilityReport(imageBase64);
+    const fixes = this.generateAutoFixes(null, report, null);
+
+    return fixes;
+  }
+
+  /**
+   * Gera relatório de acessibilidade para imagens
+   */
+  generateAccessibilityReport(imageBase64) {
+    // Simula análise de acessibilidade para imagens em Base64
+    return {
+      contrastDetails: {
+        wcagLevel: 'AA',
+        isLargeText: false,
+        background: '#FFFFFF'
+      },
+      errors: ['alt attribute missing']
+    };
+  }
+}
   constructor() {
     // Padrões WCAG 2.1 para contraste
     this.contrastRatios = {

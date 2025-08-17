@@ -47,11 +47,11 @@ class ElementSelector {
   
   createOverlay() {
     // Remove any existing overlays first
-    const existingOverlays = document.querySelectorAll('.dsa-selector-overlay');
+    const existingOverlays = document.querySelectorAll('.frontable-selector-overlay');
     existingOverlays.forEach(overlay => overlay.remove());
     
     this.overlay = document.createElement('div');
-    this.overlay.className = 'dsa-selector-overlay';
+    this.overlay.className = 'frontable-selector-overlay';
     document.body.appendChild(this.overlay);
   }
   
@@ -124,7 +124,7 @@ class ElementSelector {
       console.warn('⚠️ ElementSelector: MouseOver called but selector is disabled!');
       return;
     }
-    if (e.target.closest('.dsa-chat-panel')) return;
+    if (e.target.closest('.frontable-chat-panel')) return;
     if (this.selectedElement) return; // Stop hovering after selection
     
     this.hoveredElement = e.target;
@@ -136,7 +136,7 @@ class ElementSelector {
       console.warn('⚠️ ElementSelector: MouseOut called but selector is disabled!');
       return;
     }
-    if (e.target.closest('.dsa-chat-panel')) return;
+    if (e.target.closest('.frontable-chat-panel')) return;
     if (this.selectedElement) return; // Keep overlay visible after selection
     
     this.hoveredElement = null;
@@ -155,7 +155,7 @@ class ElementSelector {
       return;
     }
     
-    if (e.target.closest('.dsa-chat-panel')) return;
+    if (e.target.closest('.frontable-chat-panel')) return;
     
     console.log(`🖱️ ElementSelector [${this.instanceId}]: Processing click on`, e.target.tagName);
     
@@ -284,7 +284,7 @@ class ElementSelector {
     
     // Create a new overlay for this element
     const overlay = document.createElement('div');
-    overlay.className = 'dsa-multi-selector-overlay';
+    overlay.className = 'frontable-multi-selector-overlay';
     overlay.dataset.elementId = this.getElementId(element);
     
     overlay.style.cssText = `
@@ -305,7 +305,7 @@ class ElementSelector {
 
     // Add selection counter
     const counter = document.createElement('div');
-    counter.className = 'dsa-selection-counter';
+    counter.className = 'frontable-selection-counter';
     counter.textContent = this.multiSelectedElements.length;
     counter.style.cssText = `
       position: absolute !important;
@@ -348,8 +348,8 @@ class ElementSelector {
 
   forceRemoveAllSelectionOverlays() {
     // Force remove any remaining selection overlays that might be stuck in DOM
-    const allMultiOverlays = document.querySelectorAll('.dsa-multi-selector-overlay');
-    const allCounters = document.querySelectorAll('.dsa-selection-counter');
+    const allMultiOverlays = document.querySelectorAll('.frontable-multi-selector-overlay');
+    const allCounters = document.querySelectorAll('.frontable-selection-counter');
     
     allMultiOverlays.forEach(overlay => {
       try {

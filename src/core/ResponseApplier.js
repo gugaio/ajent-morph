@@ -18,10 +18,18 @@ class ResponseApplier {
       'textTransform', 'textIndent', 'wordSpacing', 'whiteSpace',
       'wordWrap', 'wordBreak', 'textOverflow', 'textShadow',
         
-      // Colors
-      'color', 'backgroundColor', 'backgroundImage', 'backgroundPosition',
-      'backgroundSize', 'backgroundRepeat', 'backgroundAttachment',
+      // Colors and Background
+      'color', 'background', 'backgroundColor', 'backgroundImage', 'backgroundPosition',
+      'backgroundSize', 'backgroundRepeat', 'backgroundAttachment', 'backgroundClip',
       'opacity', 'visibility',
+      // WebKit specific properties for gradients and text effects
+      'WebkitBackgroundClip', 'webkitBackgroundClip', '-webkit-background-clip',
+      'WebkitTextFillColor', 'webkitTextFillColor', '-webkit-text-fill-color',
+      'WebkitTextStroke', 'webkitTextStroke', '-webkit-text-stroke',
+      'WebkitTextStrokeColor', 'webkitTextStrokeColor', '-webkit-text-stroke-color',
+      'WebkitTextStrokeWidth', 'webkitTextStrokeWidth', '-webkit-text-stroke-width',
+      // Mozilla specific
+      'MozBackgroundClip', 'mozBackgroundClip', '-moz-background-clip',
         
       // Borders
       'border', 'borderTop', 'borderRight', 'borderBottom', 'borderLeft',
@@ -406,12 +414,16 @@ class ResponseApplier {
       
     // Propriedades que podem ter múltiplos valores (padding, margin)
     if (this.canHaveMultipleValues(property)) {
-      return /^(\d+(\.\d+)?(px|em|rem|%|vh|vw)?\s*)+$/.test(value.trim());
+      // Permite valores como 'auto', 'inherit', 'initial', etc., além de valores numéricos e funções CSS
+      return /^(auto|inherit|initial|unset|\d+(\.\d+)?(px|em|rem|%|vh|vw)?\s*)+$/.test(value.trim()) ||
+             /^(clamp|calc|min|max)\s*\([^)]+\)$/i.test(value);
     }
       
     // Propriedades numéricas simples
     if (this.needsPixelUnit(property)) {
-      return /^\d+(\.\d+)?(px|em|rem|%|vh|vw)?$/.test(value);
+      // Permite 'auto' e outros valores CSS válidos além de valores numéricos
+      return /^(auto|inherit|initial|unset|\d+(\.\d+)?(px|em|rem|%|vh|vw)?)$/.test(value) ||
+             /^(clamp|calc|min|max)\s*\([^)]+\)$/i.test(value);
     }
       
     return true;
@@ -431,20 +443,66 @@ class ResponseApplier {
   }
     
   getElementSelector(element) {
-    if (element.id) return `#${element.id}`;
+    if (element.id) {
+      const escapedId = this.escapeCSSIdentifier(element.id);
+      return `#${escapedId}`;
+    }
     if (element.className) {
-      const classes = element.className.split(' ').filter(c => c).slice(0, 3);
-      return `.${classes.join('.')}`;
+      const allClasses = element.className.split(' ').filter(c => c);
+      const simpleClasses = this.getSimpleClasses(allClasses);
+      
+      if (simpleClasses.length > 0) {
+        const escapedClasses = simpleClasses.slice(0, 2).map(cls => this.escapeCSSIdentifier(cls));
+        return `.${escapedClasses.join('.')}`;
+      } else {
+        // If no simple classes, fall back to nth-child
+        if (element.parentElement) {
+          const siblings = Array.from(element.parentElement.children);
+          const index = siblings.indexOf(element) + 1;
+          return `${element.parentElement.tagName.toLowerCase()} > :nth-child(${index})`;
+        }
+      }
     }
     return element.tagName.toLowerCase();
+  }
+
+  /**
+   * Escapes CSS identifiers for Tailwind CSS compatibility
+   * @param {string} identifier - The CSS identifier to escape
+   * @returns {string} - The escaped CSS identifier
+   */
+  escapeCSSIdentifier(identifier) {
+    return identifier
+      // Escape brackets [ and ]
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]')
+      // Escape colons (for pseudo-selectors and Tailwind modifiers)
+      .replace(/:/g, '\\:')
+      // Escape forward slashes
+      .replace(/\//g, '\\/')
+      // Escape parentheses
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      // Escape dots in values (but not class separators)
+      .replace(/(\[[^\]]*)\./g, '$1\\.')
+      // Escape percentage signs
+      .replace(/%/g, '\\%')
+      // Escape plus signs
+      .replace(/\+/g, '\\+');
   }
     
   addToHistory(change) {
     // Enrich change with more specific element context
     if (change.element && typeof change.element === 'string') {
-      const element = document.querySelector(change.element);
-      if (element) {
-        change.elementContext = this.generateElementContext(element);
+      try {
+        // The selector should already be escaped, but try to find the element
+        const element = document.querySelector(change.element);
+        if (element) {
+          change.elementContext = this.generateElementContext(element);
+        }
+      } catch (error) {
+        // If the stored selector is invalid, try to find the element by classes
+        console.warn('Selector error in addToHistory, skipping context generation:', error);
       }
     }
     
@@ -507,42 +565,39 @@ class ResponseApplier {
    * Generate the most specific yet practical CSS selector for an element
    */
   generateUniqueSelector(element) {
-    // Priority order: ID > unique class combination > parent context + classes > nth-child
+    // Priority order: ID > simple class combination > nth-child > tag selector
     
     // 1. If element has ID, use it (most specific)
     if (element.id) {
-      return `#${element.id}`;
+      const escapedId = this.escapeCSSIdentifier(element.id);
+      try {
+        const testElements = document.querySelectorAll(`#${escapedId}`);
+        if (testElements.length === 1) {
+          return `#${escapedId}`;
+        }
+      } catch (error) {
+        console.warn('Error with ID selector, falling back:', error);
+      }
     }
 
-    // 2. Try class combinations
+    // 2. Try simple class combinations (avoid complex Tailwind patterns)
     if (element.classList.length > 0) {
-      const classSelector = '.' + Array.from(element.classList).join('.');
-      const elementsWithSameClasses = document.querySelectorAll(classSelector);
-      if (elementsWithSameClasses.length === 1) {
-        return classSelector;
+      const simpleClasses = this.getSimpleClasses(Array.from(element.classList));
+      if (simpleClasses.length > 0) {
+        const escapedClasses = simpleClasses.map(cls => this.escapeCSSIdentifier(cls));
+        const classSelector = '.' + escapedClasses.slice(0, 2).join('.'); // Limit to 2 classes
+        try {
+          const elementsWithSameClasses = document.querySelectorAll(classSelector);
+          if (elementsWithSameClasses.length === 1) {
+            return classSelector;
+          }
+        } catch (error) {
+          console.warn('Error querying simple class selector:', classSelector, error);
+        }
       }
     }
 
-    // 3. Use parent context + classes/tag
-    if (element.parentElement) {
-      const parentSelector = element.parentElement.id 
-        ? `#${element.parentElement.id}`
-        : element.parentElement.classList.length > 0
-        ? '.' + Array.from(element.parentElement.classList).join('.')
-        : element.parentElement.tagName.toLowerCase();
-
-      const childSelector = element.classList.length > 0
-        ? '.' + Array.from(element.classList).join('.')
-        : element.tagName.toLowerCase();
-
-      const combinedSelector = `${parentSelector} > ${childSelector}`;
-      const elementsWithCombined = document.querySelectorAll(combinedSelector);
-      if (elementsWithCombined.length === 1) {
-        return combinedSelector;
-      }
-    }
-
-    // 4. Fall back to nth-child if needed
+    // 3. Fall back to nth-child (reliable and always works)
     if (element.parentElement) {
       const siblings = Array.from(element.parentElement.children);
       const index = siblings.indexOf(element) + 1;
@@ -550,8 +605,25 @@ class ResponseApplier {
       return `${parentSelector} > :nth-child(${index})`;
     }
 
-    // 5. Last resort: basic tag selector
+    // 4. Last resort: basic tag selector
     return element.tagName.toLowerCase();
+  }
+
+  /**
+   * Filter out complex Tailwind patterns that may not work as CSS selectors
+   * @param {Array} classes - Array of class names
+   * @returns {Array} - Array of simple class names
+   */
+  getSimpleClasses(classes) {
+    return classes.filter(cls => {
+      // Filter out complex Tailwind patterns
+      return !cls.includes('@') &&      // Responsive breakpoints like @[480px]:gap-8
+             !cls.includes('[') &&      // Arbitrary values like min-h-[480px]
+             !cls.includes(':') &&      // Pseudo-selectors and modifiers
+             !cls.includes('/') &&      // Fractions like w-1/2
+             !cls.includes('%') &&      // Percentages
+             cls.length < 30;           // Avoid extremely long class names
+    });
   }
     
   getHistory() {

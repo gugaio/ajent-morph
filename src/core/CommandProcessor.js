@@ -23,7 +23,8 @@ class CommandProcessor {
       this.squad = new Squad({
         agents,
         apiToken: apiToken,
-        apiUrl: 'http://localhost:5000'
+        apiUrl: 'http://localhost:5000',
+        model: 'gpt-5-mini',
       });
       //apiUrl: 'http://localhost:5000'
       this.hasAI = true;
@@ -34,7 +35,7 @@ class CommandProcessor {
   }
   
   async process(message, context = {}) {
-    const { selectedElement, selectedElements, mode, elementsData } = context;
+    const { selectedElement, selectedElements, mode, elementsData, visualContext } = context;
     
     // Support both old (selectedElement) and new (selectedElements) formats
     const elements = selectedElements || (selectedElement ? [selectedElement] : []);
@@ -55,7 +56,7 @@ class CommandProcessor {
       
       if (mode === 'intelligent_decision') {
         // Handle intelligent decision mode using DOMManipulationAgent
-        return await this.processIntelligentDecision(message, elements);
+        return await this.processIntelligentDecision(message, elements, visualContext);
       }
       
       // Original CSS modification logic
@@ -152,20 +153,27 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
     return this.applier.getHistory();
   }
   
-  async callLLM(prompt) {
+  async callLLM(prompt, visualContext = null) {
     try {
-      // Use the AI agent squad to process the request
-      const response = await this.squad.send(prompt);
-      
-      // The DOMManipulationAgent should return a structured response
-      return response;
+      // If visual context is provided, send message with image
+      if (visualContext && visualContext.image) {
+        console.log('Sending message with visual context to LLM');
+        const response = await this.squad.send(prompt, {
+          images: [visualContext.image]
+        });
+        return response;
+      } else {
+        // Use the AI agent squad to process the request (text only)
+        const response = await this.squad.send(prompt);
+        return response;
+      }
     } catch (error) {
       console.error('AI Agent error:', error);
       throw new Error(`AI processing failed: ${error.message}`);
     }
   }
 
-  async processIntelligentDecision(message, elements) {
+  async processIntelligentDecision(message, elements, visualContext = null) {
     // Special case: Claude Code instructions don't require selected elements
     const isClaudeCodeRequest = message.toLowerCase().includes('claude code') || 
                                message.toLowerCase().includes('instruções') && message.toLowerCase().includes('ide') ||
@@ -212,6 +220,14 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         contextPrompt += 'No elements selected.\n';
       }
 
+      // Add visual context if available
+      if (visualContext) {
+        contextPrompt += `\nVisual Context: Screenshot of selected elements provided for better understanding.\n`;
+        contextPrompt += `Visual Description: ${visualContext.description}\n`;
+        contextPrompt += `Screenshot Metadata: ${JSON.stringify(visualContext.metadata, null, 2)}\n\n`;
+        contextPrompt += 'Please analyze both the DOM data and the visual screenshot to provide the best suggestions.\n';
+      }
+
       console.log('Sending intelligent decision prompt to LLM:', contextPrompt);
 
       // Set the element selectors in a way the agent can access them
@@ -223,7 +239,7 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
       }
 
       // Use the LLM squad to process the intelligent decision
-      const response = await this.callLLM(contextPrompt);
+      const response = await this.callLLM(contextPrompt, visualContext);
       
       console.log('LLM response for intelligent decision:', response);
 

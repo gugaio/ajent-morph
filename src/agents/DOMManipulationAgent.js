@@ -1695,9 +1695,9 @@ Current Styling:`;
 
     // Generate a data attribute selector as fallback
     const timestamp = Date.now();
-    const uniqueId = `dsa-element-${timestamp}-${Math.random().toString(36).substring(2, 11)}`;
-    element.setAttribute('data-dsa-id', uniqueId);
-    return `[data-dsa-id='${uniqueId}']`;
+    const uniqueId = `frontable-element-${timestamp}-${Math.random().toString(36).substring(2, 11)}`;
+    element.setAttribute('data-frontable-id', uniqueId);
+    return `[data-frontable-id='${uniqueId}']`;
   }
 
   reconstructElementsFromSelectors(selectors) {
@@ -1796,14 +1796,14 @@ Current Styling:`;
 
   addNewElementIndicator(element) {
     // Add a temporary visual indicator for the new element
-    element.style.animation = 'dsa-new-element-pulse 2s ease-in-out';
+    element.style.animation = 'frontable-new-element-pulse 2s ease-in-out';
     
     // Add CSS for the animation if it doesn't exist
-    if (!document.querySelector('#dsa-new-element-styles')) {
+    if (!document.querySelector('#frontable-new-element-styles')) {
       const style = document.createElement('style');
-      style.id = 'dsa-new-element-styles';
+      style.id = 'frontable-new-element-styles';
       style.textContent = `
-        @keyframes dsa-new-element-pulse {
+        @keyframes frontable-new-element-pulse {
           0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
           70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
           100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }

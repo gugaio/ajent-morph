@@ -372,16 +372,50 @@ class UXAgent extends Agent {
     for (const selector of selectors) {
       if (typeof selector === 'string') {
         try {
-          const element = document.querySelector(selector);
-          if (element) {
-            elements.push(element);
+          // Escape Tailwind CSS special characters for CSS selectors
+          const escapedSelector = this.escapeCSSSelector(selector);
+          
+          // Use querySelectorAll to get all matching elements instead of just the first
+          const foundElements = document.querySelectorAll(escapedSelector);
+          if (foundElements.length > 0) {
+            // Convert NodeList to Array and add all elements
+            elements.push(...Array.from(foundElements));
+            console.log(`Found ${foundElements.length} elements matching selector "${selector}" (escaped: "${escapedSelector}")`);
+          } else {
+            console.warn(`No elements found for selector "${selector}" (escaped: "${escapedSelector}")`);
           }
         } catch (error) {
-          console.warn(`Failed to find element with selector "${selector}":`, error);
+          console.warn(`Failed to find elements with selector "${selector}":`, error);
         }
       }
     }
     return elements;
+  }
+
+  /**
+   * Escapes special characters in CSS selectors for Tailwind CSS compatibility
+   * @param {string} selector - The CSS selector to escape
+   * @returns {string} - The escaped CSS selector
+   */
+  escapeCSSSelector(selector) {
+    // Handle Tailwind CSS classes with special characters
+    return selector
+      // Escape brackets [ and ]
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]')
+      // Escape colons (for pseudo-selectors and Tailwind modifiers)
+      .replace(/:/g, '\\:')
+      // Escape forward slashes
+      .replace(/\//g, '\\/')
+      // Escape parentheses
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      // Escape dots in values (but not class separators)
+      .replace(/(\[[^\]]*)\./g, '$1\\.')
+      // Escape percentage signs
+      .replace(/%/g, '\\%')
+      // Escape plus signs
+      .replace(/\+/g, '\\+');
   }
 
   async validateStylesWrapper(params) {
@@ -463,8 +497,8 @@ class UXAgent extends Agent {
     const validation = await this.validateStyles(normalizedStyles);
 
     if (!validation.isValid) {
-      console.warn('Invalid styles detected:', validation.errors);
-      // Continue with valid styles only
+      console.info('Some styles were filtered during validation:', validation.errors);
+      // Continue with valid styles only - this is expected behavior
     }
 
     // Apply styles to each selected element
@@ -603,7 +637,17 @@ class UXAgent extends Agent {
       'flexDirection', 'justifyContent', 'alignItems', 'alignSelf', 'flex', 'flexGrow', 'flexShrink',
       'gridTemplateColumns', 'gridTemplateRows', 'gridGap', 'gap',
       'transform', 'transition', 'animation', 'opacity', 'visibility', 'overflow',
-      'cursor', 'userSelect', 'pointerEvents', 'zIndex'
+      'cursor', 'userSelect', 'pointerEvents', 'zIndex',
+      // WebKit specific properties for gradients and text effects
+      'WebkitBackgroundClip', 'webkitBackgroundClip', '-webkit-background-clip',
+      'WebkitTextFillColor', 'webkitTextFillColor', '-webkit-text-fill-color',
+      'WebkitTextStroke', 'webkitTextStroke', '-webkit-text-stroke',
+      'WebkitTextStrokeColor', 'webkitTextStrokeColor', '-webkit-text-stroke-color',
+      'WebkitTextStrokeWidth', 'webkitTextStrokeWidth', '-webkit-text-stroke-width',
+      // Additional background properties
+      'backgroundClip', 'background-clip',
+      // Mozilla specific
+      'MozBackgroundClip', 'mozBackgroundClip', '-moz-background-clip'
     ]);
 
     const errors = [];

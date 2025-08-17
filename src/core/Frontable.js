@@ -1,8 +1,9 @@
 import ChatInterface from '../ui/ChatInterface';
 import ElementSelector from './ElementSelector';
 import CommandProcessor from './CommandProcessor';
+import VisualContextManager from '../utils/VisualContextManager';
 
-class DesignSystemAgent {
+class Frontable {
   constructor(options = {}) {
     this.isActive = false;
     this.activationSequence = options.activationSequence || 'frontable';
@@ -11,6 +12,7 @@ class DesignSystemAgent {
     this.chatInterface = new ChatInterface();
     this.elementSelector = new ElementSelector();
     this.commandProcessor = new CommandProcessor('faab7706-adec-498e-bf2a-6da0ffe8ae82', this.chatInterface);
+    this.visualContextManager = new VisualContextManager();
     
     this.init();
   }
@@ -32,7 +34,7 @@ class DesignSystemAgent {
   
   handleKeydown(e) {
     // Handle ESC key when agent is active (but not when typing in chat)
-    if (this.isActive && e.key === 'Escape' && !e.target.matches('.dsa-input')) {
+    if (this.isActive && e.key === 'Escape' && !e.target.matches('.frontable-input')) {
       this.elementSelector.clearMultiSelection();
       return;
     }
@@ -90,10 +92,73 @@ class DesignSystemAgent {
   
   async handleUserMessage(message) {
     try {
+      // Check if message includes visual context request
+      const includeVisual = this.visualContextManager.shouldIncludeVisualContext(message);
+      const cleanMessage = this.visualContextManager.cleanUserMessage(message);
+      let visualData = null;
+
+      // Capture screenshot if requested
+      if (includeVisual) {
+        const selectedElements = this.elementSelector.getMultiSelectedElements();
+        
+        if (selectedElements.length > 0) {
+          this.chatInterface.showProgressStatus('Capturando screenshot...', 'processing');
+          
+          try {
+            if (selectedElements.length === 1) {
+              visualData = await this.visualContextManager.captureElementScreenshot(selectedElements[0]);
+            } else {
+              visualData = await this.visualContextManager.captureMultipleElements(selectedElements);
+            }
+            
+            if (visualData) {
+              // Display message with visual context
+              this.chatInterface.addVisualMessage({
+                text: cleanMessage,
+                visualData: visualData,
+                type: 'user'
+              });
+              
+              this.chatInterface.updateProgressStatus('Screenshot capturado!', 'success');
+              setTimeout(() => this.chatInterface.removeProgressStatus(), 1500);
+            } else {
+              throw new Error('Falha na captura de screenshot');
+            }
+          } catch (error) {
+            console.error('Error capturing visual context:', error);
+            this.chatInterface.showErrorStatus('Erro na captura de screenshot');
+            setTimeout(() => this.chatInterface.removeProgressStatus(), 2000);
+            
+            // Fall back to text-only message
+            this.chatInterface.addMessage({
+              type: 'user',
+              content: cleanMessage
+            });
+          }
+        } else {
+          // No elements selected, but user requested visual context
+          this.chatInterface.addMessage({
+            type: 'user',
+            content: cleanMessage
+          });
+          this.chatInterface.addMessage({
+            type: 'agent',
+            content: '⚠️ Comando #image detectado, mas nenhum elemento está selecionado. Selecione elementos primeiro para incluir contexto visual.'
+          });
+          return;
+        }
+      } else {
+        // Regular text message
+        this.chatInterface.addMessage({
+          type: 'user',
+          content: message
+        });
+      }
+
       // Show typing indicator
       this.chatInterface.showTyping();
 
-      if (typeof message === 'string' && message.trim().toLowerCase() === 'undo') {
+      if (typeof cleanMessage === 'string' && cleanMessage.trim().toLowerCase() === 'undo') {
         const undoResult = await this.undoLastChange();
         this.chatInterface.hideTyping();
         this.chatInterface.addMessage({
@@ -105,8 +170,8 @@ class DesignSystemAgent {
         return;
       }
       
-      // Send message directly to the LLM agent to decide action
-      await this.handleUserCommand(message);
+      // Send message to command processor (use original message if no visual context)
+      await this.handleUserCommand(includeVisual ? cleanMessage : message, visualData);
       
     } catch (error) {
       this.chatInterface.hideTyping();
@@ -121,7 +186,7 @@ class DesignSystemAgent {
     }
   }
 
-  async handleUserCommand(message) {
+  async handleUserCommand(message, visualData = null) {
     let result = null;
     
     try {
@@ -143,10 +208,17 @@ class DesignSystemAgent {
         }
       }
       
+      // Prepare visual context for LLM if available
+      let visualContext = null;
+      if (visualData) {
+        visualContext = await this.visualContextManager.prepareVisualDataForLLM(visualData, `Visual context for: ${message}`);
+      }
+
       // Process the command with the LLM agent to determine action and execute it
       result = await this.commandProcessor.process(message, {
         selectedElements: selectedElements,
-        mode: 'intelligent_decision'
+        mode: 'intelligent_decision',
+        visualContext: visualContext
       }, (llmResponse) => {
         // Show typing indicator during processing
         this.chatInterface.addMessage(
@@ -505,14 +577,14 @@ class DesignSystemAgent {
 
   addNewElementIndicator(element) {
     // Add a temporary visual indicator for the new element
-    element.style.animation = 'dsa-new-element-pulse 2s ease-in-out';
+    element.style.animation = 'frontable-new-element-pulse 2s ease-in-out';
     
     // Add CSS for the animation if it doesn't exist
-    if (!document.querySelector('#dsa-new-element-styles')) {
+    if (!document.querySelector('#frontable-new-element-styles')) {
       const style = document.createElement('style');
-      style.id = 'dsa-new-element-styles';
+      style.id = 'frontable-new-element-styles';
       style.textContent = `
-        @keyframes dsa-new-element-pulse {
+        @keyframes frontable-new-element-pulse {
           0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
           70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
           100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
@@ -528,4 +600,4 @@ class DesignSystemAgent {
   }
 }
 
-export default DesignSystemAgent;
+export default Frontable;

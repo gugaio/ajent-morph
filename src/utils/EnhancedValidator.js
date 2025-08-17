@@ -250,7 +250,7 @@ class EnhancedValidator {
     this.addContextualSuggestions(result, context);
 
     // Validações semânticas (combinações de propriedades)
-    this.performSemanticValidation(result, styles, context);
+    this.performSemanticValidation(result, styles);
 
     // Cache do resultado
     this.validationCache.set(cacheKey, {
@@ -413,6 +413,21 @@ class EnhancedValidator {
       result.normalizedValue = value;
     }
     
+    // Valores CSS válidos especiais
+    const specialValues = ['auto', 'inherit', 'initial', 'unset', 'none', 'normal'];
+    if (specialValues.includes(value.toLowerCase())) {
+      result.normalizedValue = value.toLowerCase();
+      return result;
+    }
+
+    // Funções CSS modernas (clamp, calc, min, max)
+    const cssFunctionPattern = /^(clamp|calc|min|max)\s*\([^)]+\)$/i;
+    if (cssFunctionPattern.test(value)) {
+      result.normalizedValue = value;
+      result.suggestions.push(`Função CSS moderna detectada: ${value.split('(')[0]}()`);
+      return result;
+    }
+
     // Se é apenas número, adiciona px como padrão
     if (/^\d+(\.\d+)?$/.test(value)) {
       result.normalizedValue = value + 'px';
@@ -426,11 +441,11 @@ class EnhancedValidator {
 
     if (!match) {
       result.isValid = false;
-      result.errors.push(`Tamanho inválido: '${value}'. Use formato como '16px', '1em', '100%'.`);
+      result.errors.push(`Tamanho inválido: '${value}'. Use formato como '16px', '1em', '100%' ou valores especiais como 'auto'.`);
       return result;
     }
 
-    const [, number, unit] = match;
+    const [, , unit] = match;
     if (propMeta.units && !propMeta.units.includes(unit)) {
       result.warnings.push(`Unidade '${unit}' pode não ser ideal. Unidades recomendadas: ${propMeta.units.join(', ')}`);
     }
@@ -564,7 +579,7 @@ class EnhancedValidator {
   /**
    * Validação semântica (verifica combinações de propriedades)
    */
-  performSemanticValidation(result, styles, context) {
+  performSemanticValidation(result, styles) {
     // Verifica combinações problemáticas
     if (styles.position === 'fixed' && !styles.top && !styles.bottom && !styles.left && !styles.right) {
       result.warnings.push('Elemento com position:fixed deve ter pelo menos uma propriedade de posicionamento (top, left, etc.)');

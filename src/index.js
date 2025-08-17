@@ -1,19 +1,19 @@
 import './styles/main.css';
-import DesignSystemAgent from './core/DesignSystemAgent';
+import Frontable from './core/Frontable';
 import ChatInterface from './ui/ChatInterface';
 import ElementSelector from './core/ElementSelector';
 import CommandProcessor from './core/CommandProcessor';
 
 // Auto-initialize when script is loaded in browser
 if (typeof window !== 'undefined') {
-  window.DesignSystemAgent = DesignSystemAgent;
+  window.Frontable = Frontable;
   
   // Auto-start the agent
-  const agent = new DesignSystemAgent();
+  const agent = new Frontable();
   window.dsAgent = agent;
   
   console.log('🤖 Frontable loaded! Type "frontable" to activate.');
 }
 
-export default DesignSystemAgent;
+export default Frontable;
 export { ChatInterface, ElementSelector, CommandProcessor };

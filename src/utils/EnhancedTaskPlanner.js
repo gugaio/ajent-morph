@@ -5,6 +5,36 @@
  * progresso visual e otimização automática de execução
  */
 class EnhancedTaskPlanner {
+  /*...*/
+
+  /**
+   * Adiciona suporte para tarefas com imagens em Base64
+   */
+  handleImageTask(imageBase64, taskContext) {
+    const template = this.analyzeCommandType('image_task', taskContext);
+
+    const newTask = {
+      id: 'process_image',
+      name: 'Processar imagem Base64',
+      estimatedTime: 30000, // 30 segundos
+      dependencies: [],
+      context: { imageBase64 }
+    };
+
+    this.addTaskToPlan(newTask, template);
+  }
+
+  /**
+   * Adiciona uma tarefa ao plano
+   */
+  addTaskToPlan(task, template) {
+    const plan = this.getCurrentPlan();
+    plan.subtasks.push({
+      ...task,
+      template
+    });
+    this.updatePlanProgress(plan);
+  }
   constructor() {
     // Armazenamento de planos ativos
     this.activePlans = new Map();

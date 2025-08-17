@@ -12,18 +12,18 @@ npm run build
 ## Usage
 
 ### Browser Console
-Copy and paste the generated `dist/design-system-agent.min.js` into browser console.
+Copy and paste the generated `dist/frontable.min.js` into browser console.
 
 ### Script Tag
 ```html
-<script src="design-system-agent.min.js"></script>
+<script src="frontable.min.js"></script>
 ```
 
 ### NPM Module
 ```javascript
-import DesignSystemAgent from 'design-system-agent';
+import Frontable from 'frontable';
 
-const agent = new DesignSystemAgent({
+const agent = new Frontable({
   activationSequence: 'frontable'
 });
 ```
@@ -55,6 +55,6 @@ npm run build
 ```
 
 Generates:
-- `dist/design-system-agent.min.js` - Minified production build
-- `dist/design-system-agent.css` - Extracted styles
+- `dist/frontable.min.js` - Minified production build
+- `dist/frontable.css` - Extracted styles
 - `dist/demo.html` - Demo page

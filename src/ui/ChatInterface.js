@@ -13,49 +13,46 @@ class ChatInterface {
   
   createInterface() {
     // Remove any existing panels first
-    const existingPanels = document.querySelectorAll('.dsa-chat-panel');
+    const existingPanels = document.querySelectorAll('.frontable-chat-panel');
     existingPanels.forEach(panel => panel.remove());
     
     this.panel = document.createElement('div');
-    this.panel.className = 'dsa-chat-panel';
+    this.panel.className = 'frontable-chat-panel';
     
     this.panel.innerHTML = `
-      <div class="dsa-chat-header">
+      <div class="frontable-chat-header">
         <div>
-          <div class="dsa-title">Frontable</div>
+          <div class="frontable-title">Frontable</div>
         </div>
-        <button class="dsa-close-btn">×</button>
+        <button class="frontable-close-btn">×</button>
       </div>
       
-      <div class="dsa-messages"></div>
+      <div class="frontable-messages"></div>
       
-      <div class="dsa-task-progress" style="display: none;">
-        <div class="dsa-task-header">
-          <span class="dsa-task-title">🎯 Plano de Execução</span>
-          <span class="dsa-task-stats">0/0</span>
+      <div class="frontable-task-progress" style="display: none;">
+        <div class="frontable-task-header">
+          <span class="frontable-task-title">🎯 Plano de Execução</span>
+          <span class="frontable-task-stats">0/0</span>
         </div>
-        <div class="dsa-task-list"></div>
+        <div class="frontable-task-list"></div>
       </div>
       
-      <div class="dsa-input-container">
-        <div class="dsa-input-wrapper">
+      <div class="frontable-input-container">
+        <div class="frontable-input-wrapper">
           <textarea 
-            class="dsa-input" 
+            class="frontable-input" 
             placeholder="Descreva o que você quer fazer..."
             rows="1"
           ></textarea>
-          <button class="dsa-send-btn">
+          <button class="frontable-send-btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
           </button>
         </div>
-        <div class="dsa-suggestions">
-          <div class="dsa-suggestion" data-command="Mudar cor do botão">🎨 Mudar cor</div>
-          <div class="dsa-suggestion" data-command="Aumentar espaçamento">📏 Espaçamento</div>
-          <div class="dsa-suggestion" data-command="Criar elemento similar">🔄 Criar similar</div>
-          <div class="dsa-suggestion" data-command="Adicionar mais um botão">➕ Adicionar elemento</div>
-          <div class="dsa-suggestion dsa-special-suggestion" data-command="Gerar instruções Claude Code">⚡ Instruções para IDE</div>
+        <div class="frontable-image-hint">💡 Dica: Use <code>#image</code> para incluir screenshot</div>
+        <div class="frontable-suggestions">
+             <div class="frontable-suggestion frontable-special-suggestion" data-command="Gerar instruções Claude Code">⚡ Instruções para IDE</div>
         </div>
       </div>
     `;
@@ -66,10 +63,10 @@ class ChatInterface {
   }
   
   setupEventListeners() {
-    this.messagesContainer = this.panel.querySelector('.dsa-messages');
-    this.inputField = this.panel.querySelector('.dsa-input');
-    const sendBtn = this.panel.querySelector('.dsa-send-btn');
-    const closeBtn = this.panel.querySelector('.dsa-close-btn');
+    this.messagesContainer = this.panel.querySelector('.frontable-messages');
+    this.inputField = this.panel.querySelector('.frontable-input');
+    const sendBtn = this.panel.querySelector('.frontable-send-btn');
+    const closeBtn = this.panel.querySelector('.frontable-close-btn');
     
     // Input handling
     this.inputField.addEventListener('keydown', (e) => {
@@ -91,7 +88,7 @@ class ChatInterface {
     });
     
     // Suggestion clicks
-    this.panel.querySelectorAll('.dsa-suggestion').forEach(suggestion => {
+    this.panel.querySelectorAll('.frontable-suggestion').forEach(suggestion => {
       suggestion.addEventListener('click', () => {
         const command = suggestion.dataset.command;
         this.inputField.value = command;
@@ -142,20 +139,154 @@ class ChatInterface {
   
   addMessage(message) {
     const messageEl = document.createElement('div');
-    messageEl.className = `dsa-message ${message.type}`;
-    messageEl.textContent = message.content;
+    messageEl.className = `frontable-message ${message.type}`;
+    
+    // Check if message has visual context
+    if (message.visualContext && message.visualContext.hasImage) {
+      messageEl.classList.add('frontable-message-visual');
+      
+      // Create message content container
+      const contentContainer = document.createElement('div');
+      contentContainer.className = 'frontable-message-content';
+      
+      // Add text content
+      const textContent = document.createElement('div');
+      textContent.className = 'frontable-message-text';
+      textContent.textContent = message.content;
+      contentContainer.appendChild(textContent);
+      
+      // Add canvas if provided
+      if (message.visualContext.canvas) {
+        const canvasContainer = document.createElement('div');
+        canvasContainer.className = 'frontable-message-canvas-container';
+        canvasContainer.appendChild(message.visualContext.canvas);
+        contentContainer.appendChild(canvasContainer);
+        
+        // Add visual context indicator
+        const indicator = this.createVisualContextIndicator();
+        contentContainer.appendChild(indicator);
+      }
+      
+      messageEl.appendChild(contentContainer);
+    } else {
+      messageEl.textContent = message.content;
+    }
+    
+    // Check for duplicate messages to prevent double display
+    const lastMessage = this.messagesContainer.lastElementChild;
+    if (lastMessage && lastMessage.textContent === messageEl.textContent && 
+        lastMessage.className === messageEl.className) {
+      return; // Don't add duplicate message
+    }
     
     this.messagesContainer.appendChild(messageEl);
     this.scrollToBottom();
   }
+
+  /**
+   * Creates a message with visual context (canvas)
+   */
+  addVisualMessage(messageData) {
+    const { text, visualData, type = 'user' } = messageData;
+    
+    const messageEl = document.createElement('div');
+    messageEl.className = `frontable-message ${type} frontable-message-visual`;
+    
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'frontable-message-content';
+    
+    // Add text content
+    const textContent = document.createElement('div');
+    textContent.className = 'frontable-message-text';
+    textContent.textContent = text;
+    contentContainer.appendChild(textContent);
+    
+    // Add canvas
+    if (visualData && visualData.canvas) {
+      const canvasContainer = document.createElement('div');
+      canvasContainer.className = 'frontable-message-canvas-container';
+      
+      const displayCanvas = this.createDisplayCanvas(visualData);
+      canvasContainer.appendChild(displayCanvas);
+      contentContainer.appendChild(canvasContainer);
+      
+      // Add visual context indicator
+      const indicator = this.createVisualContextIndicator();
+      contentContainer.appendChild(indicator);
+    }
+    
+    messageEl.appendChild(contentContainer);
+    this.messagesContainer.appendChild(messageEl);
+    this.scrollToBottom();
+    
+    return messageEl;
+  }
+
+  /**
+   * Creates a display canvas for message
+   */
+  createDisplayCanvas(visualData) {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'frontable-message-canvas';
+    canvas.width = visualData.width;
+    canvas.height = visualData.height;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(visualData.canvas, 0, 0);
+    
+    // Add click handler for modal view
+    canvas.addEventListener('click', () => {
+      this.openImageModal(visualData.dataURL);
+    });
+    
+    return canvas;
+  }
+
+  /**
+   * Creates visual context indicator
+   */
+  createVisualContextIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'frontable-visual-context-indicator';
+    indicator.innerHTML = '📷 Contexto visual incluído';
+    return indicator;
+  }
+
+  /**
+   * Opens image in modal
+   */
+  openImageModal(dataURL) {
+    const existingModal = document.querySelector('.frontable-visual-modal');
+    if (existingModal) existingModal.remove();
+    
+    const modal = document.createElement('div');
+    modal.className = 'frontable-visual-modal';
+    
+    const img = document.createElement('img');
+    img.src = dataURL;
+    img.className = 'frontable-modal-image';
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', () => modal.remove());
+    
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+  }
   
   showTyping() {
     const typingEl = document.createElement('div');
-    typingEl.className = 'dsa-typing';
+    typingEl.className = 'frontable-typing';
     typingEl.innerHTML = `
-      <div class="dsa-typing-dot"></div>
-      <div class="dsa-typing-dot"></div>
-      <div class="dsa-typing-dot"></div>
+      <div class="frontable-typing-dot"></div>
+      <div class="frontable-typing-dot"></div>
+      <div class="frontable-typing-dot"></div>
     `;
     
     this.messagesContainer.appendChild(typingEl);
@@ -163,7 +294,7 @@ class ChatInterface {
   }
   
   hideTyping() {
-    const typingEl = this.messagesContainer.querySelector('.dsa-typing');
+    const typingEl = this.messagesContainer.querySelector('.frontable-typing');
     if (typingEl) {
       typingEl.remove();
     }
@@ -175,15 +306,15 @@ class ChatInterface {
     this.hideToolProgress();
     
     const progressEl = document.createElement('div');
-    progressEl.className = 'dsa-tool-progress';
+    progressEl.className = 'frontable-tool-progress';
     progressEl.innerHTML = `
-      <div class="dsa-tool-header">
-        <span class="dsa-tool-icon">${this.getToolIcon(toolInfo.tool)}</span>
-        <span class="dsa-tool-name">${this.getToolDisplayName(toolInfo.tool)}</span>
-        <div class="dsa-progress-spinner"></div>
+      <div class="frontable-tool-header">
+        <span class="frontable-tool-icon">${this.getToolIcon(toolInfo.tool)}</span>
+        <span class="frontable-tool-name">${this.getToolDisplayName(toolInfo.tool)}</span>
+        <div class="frontable-progress-spinner"></div>
       </div>
-      <div class="dsa-tool-description">${toolInfo.description}</div>
-      ${toolInfo.target ? `<div class="dsa-tool-target">🎯 Alvo: ${toolInfo.target}</div>` : ''}
+      <div class="frontable-tool-description">${toolInfo.description}</div>
+      ${toolInfo.target ? `<div class="frontable-tool-target">🎯 Alvo: ${toolInfo.target}</div>` : ''}
     `;
     
     this.messagesContainer.appendChild(progressEl);
@@ -191,25 +322,25 @@ class ChatInterface {
   }
 
   hideToolProgress() {
-    const progressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+    const progressEl = this.messagesContainer.querySelector('.frontable-tool-progress');
     if (progressEl) {
       progressEl.remove();
     }
   }
 
   updateToolProgress(status, message) {
-    const progressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+    const progressEl = this.messagesContainer.querySelector('.frontable-tool-progress');
     if (progressEl) {
       const statusEl = document.createElement('div');
-      statusEl.className = `dsa-tool-status dsa-tool-${status}`;
+      statusEl.className = `frontable-tool-status frontable-tool-${status}`;
       statusEl.innerHTML = `
-        <span class="dsa-status-icon">${status === 'success' ? '✅' : status === 'error' ? '❌' : '⚠️'}</span>
-        <span class="dsa-status-message">${message}</span>
+        <span class="frontable-status-icon">${status === 'success' ? '✅' : status === 'error' ? '❌' : '⚠️'}</span>
+        <span class="frontable-status-message">${message}</span>
       `;
       progressEl.appendChild(statusEl);
       
       // Remove spinner
-      const spinner = progressEl.querySelector('.dsa-progress-spinner');
+      const spinner = progressEl.querySelector('.frontable-progress-spinner');
       if (spinner) {
         spinner.remove();
       }
@@ -219,7 +350,7 @@ class ChatInterface {
       // Auto-hide after 3 seconds for successful operations
       if (status === 'success') {
         setTimeout(() => {
-          const currentProgressEl = this.messagesContainer.querySelector('.dsa-tool-progress');
+          const currentProgressEl = this.messagesContainer.querySelector('.frontable-tool-progress');
           if (currentProgressEl === progressEl) {
             progressEl.style.opacity = '0.6';
             progressEl.style.transform = 'scale(0.95)';
@@ -265,7 +396,7 @@ class ChatInterface {
 
   showSelectionPreview(elements) {
     // Remove existing preview
-    const existingPreview = this.panel.querySelector('.dsa-selection-preview');
+    const existingPreview = this.panel.querySelector('.frontable-selection-preview');
     if (existingPreview) {
       existingPreview.remove();
     }
@@ -274,15 +405,15 @@ class ChatInterface {
 
     // Create selection preview
     const preview = document.createElement('div');
-    preview.className = 'dsa-selection-preview';
+    preview.className = 'frontable-selection-preview';
     preview.innerHTML = `
-      <div class="dsa-preview-header">
+      <div class="frontable-preview-header">
         <span>📝 ${elements.length} elemento(s) selecionado(s)</span>
-        <button class="dsa-clear-selection">✕</button>
+        <button class="frontable-clear-selection">✕</button>
       </div>
-      <div class="dsa-preview-list">
+      <div class="frontable-preview-list">
         ${elements.map((el, index) => `
-          <div class="dsa-preview-item">
+          <div class="frontable-preview-item">
             ${index + 1}. ${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}${el.id ? '#' + el.id : ''}
           </div>
         `).join('')}
@@ -290,11 +421,11 @@ class ChatInterface {
     `;
 
     // Insert before input container
-    const inputContainer = this.panel.querySelector('.dsa-input-container');
+    const inputContainer = this.panel.querySelector('.frontable-input-container');
     inputContainer.parentNode.insertBefore(preview, inputContainer);
 
     // Add clear selection event
-    const clearBtn = preview.querySelector('.dsa-clear-selection');
+    const clearBtn = preview.querySelector('.frontable-clear-selection');
     clearBtn.addEventListener('click', () => {
       if (this.onClearSelection) {
         this.onClearSelection();
@@ -311,25 +442,22 @@ class ChatInterface {
 
     // Listen for tool progress events
     window.addEventListener('ajentToolStart', (event) => {
-      console.log('🚀 Tool started:', event.detail);
       this.showToolProgress(event.detail);
     });
 
     window.addEventListener('ajentToolSuccess', (event) => {
-      console.log('✅ Tool success:', event.detail);
       this.updateToolProgress('success', event.detail.result);
     });
 
     window.addEventListener('ajentToolError', (event) => {
-      console.log('❌ Tool error:', event.detail);
       this.updateToolProgress('error', `Erro: ${event.detail.error}`);
     });
   }
 
   updateTaskProgress(taskPlan) {
-    const progressContainer = this.panel.querySelector('.dsa-task-progress');
-    const statsElement = this.panel.querySelector('.dsa-task-stats');
-    const listElement = this.panel.querySelector('.dsa-task-list');
+    const progressContainer = this.panel.querySelector('.frontable-task-progress');
+    const statsElement = this.panel.querySelector('.frontable-task-stats');
+    const listElement = this.panel.querySelector('.frontable-task-list');
     
     if (!progressContainer || !taskPlan) return;
     
@@ -347,7 +475,7 @@ class ChatInterface {
     if (taskPlan.tasks && Array.isArray(taskPlan.tasks)) {
       taskPlan.tasks.forEach((task) => {
         const taskElement = document.createElement('div');
-        taskElement.className = 'dsa-task-item';
+        taskElement.className = 'frontable-task-item';
         
         let emoji = '⏳';
         let statusClass = 'pending';
@@ -361,11 +489,11 @@ class ChatInterface {
         }
         
         taskElement.innerHTML = `
-          <span class="dsa-task-emoji">${emoji}</span>
-          <span class="dsa-task-description">${task.description}</span>
+          <span class="frontable-task-emoji">${emoji}</span>
+          <span class="frontable-task-description">${task.description}</span>
         `;
         
-        taskElement.classList.add(`dsa-task-${statusClass}`);
+        taskElement.classList.add(`frontable-task-${statusClass}`);
         listElement.appendChild(taskElement);
       });
     }
@@ -381,7 +509,7 @@ class ChatInterface {
   }
 
   hideTaskProgress() {
-    const progressContainer = this.panel.querySelector('.dsa-task-progress');
+    const progressContainer = this.panel.querySelector('.frontable-task-progress');
     if (progressContainer) {
       progressContainer.style.display = 'none';
     }
@@ -395,22 +523,22 @@ class ChatInterface {
     this.removeProgressStatus();
     
     const statusElement = document.createElement('div');
-    statusElement.className = `dsa-progress-status dsa-progress-${type}`;
-    statusElement.id = 'dsa-current-status';
+    statusElement.className = `frontable-progress-status frontable-progress-${type}`;
+    statusElement.id = 'frontable-current-status';
     
     const icon = this.getStatusIcon(type);
     statusElement.innerHTML = `
-      <div class="dsa-status-content">
-        <span class="dsa-status-icon">${icon}</span>
-        <span class="dsa-status-text">${message}</span>
-        <span class="dsa-status-dots">
+      <div class="frontable-status-content">
+        <span class="frontable-status-icon">${icon}</span>
+        <span class="frontable-status-text">${message}</span>
+        <span class="frontable-status-dots">
           <span>.</span><span>.</span><span>.</span>
         </span>
       </div>
     `;
     
     // Insert before input container
-    const inputContainer = this.panel.querySelector('.dsa-input-container');
+    const inputContainer = this.panel.querySelector('.frontable-input-container');
     inputContainer.parentNode.insertBefore(statusElement, inputContainer);
     
     this.scrollToBottom();
@@ -420,17 +548,17 @@ class ChatInterface {
    * Updates existing progress status message
    */
   updateProgressStatus(message, type = 'processing') {
-    const existingStatus = document.getElementById('dsa-current-status');
+    const existingStatus = document.getElementById('frontable-current-status');
     if (existingStatus) {
       const icon = this.getStatusIcon(type);
-      const textElement = existingStatus.querySelector('.dsa-status-text');
-      const iconElement = existingStatus.querySelector('.dsa-status-icon');
+      const textElement = existingStatus.querySelector('.frontable-status-text');
+      const iconElement = existingStatus.querySelector('.frontable-status-icon');
       
       if (textElement) textElement.textContent = message;
       if (iconElement) iconElement.innerHTML = icon;
       
       // Update class for styling
-      existingStatus.className = `dsa-progress-status dsa-progress-${type}`;
+      existingStatus.className = `frontable-progress-status frontable-progress-${type}`;
     } else {
       this.showProgressStatus(message, type);
     }
@@ -442,7 +570,7 @@ class ChatInterface {
    * Removes progress status message
    */
   removeProgressStatus() {
-    const statusElement = document.getElementById('dsa-current-status');
+    const statusElement = document.getElementById('frontable-current-status');
     if (statusElement) {
       statusElement.remove();
     }
@@ -493,8 +621,8 @@ class ChatInterface {
     this.removeProgressStatus();
     
     const progressElement = document.createElement('div');
-    progressElement.className = 'dsa-step-progress';
-    progressElement.id = 'dsa-step-progress';
+    progressElement.className = 'frontable-step-progress';
+    progressElement.id = 'frontable-step-progress';
     
     const stepsHtml = steps.map((step, index) => {
       const status = index < currentStep ? 'completed' : 
@@ -503,27 +631,27 @@ class ChatInterface {
                   index === currentStep ? '⚡' : '⏳';
       
       return `
-        <div class="dsa-step dsa-step-${status}">
-          <span class="dsa-step-icon">${icon}</span>
-          <span class="dsa-step-text">${step}</span>
+        <div class="frontable-step frontable-step-${status}">
+          <span class="frontable-step-icon">${icon}</span>
+          <span class="frontable-step-text">${step}</span>
         </div>
       `;
     }).join('');
     
     progressElement.innerHTML = `
-      <div class="dsa-steps-container">
-        <div class="dsa-steps-header">
-          <span class="dsa-steps-title">📋 Progresso</span>
-          <span class="dsa-steps-counter">${currentStep}/${steps.length}</span>
+      <div class="frontable-steps-container">
+        <div class="frontable-steps-header">
+          <span class="frontable-steps-title">📋 Progresso</span>
+          <span class="frontable-steps-counter">${currentStep}/${steps.length}</span>
         </div>
-        <div class="dsa-steps-list">
+        <div class="frontable-steps-list">
           ${stepsHtml}
         </div>
       </div>
     `;
     
     // Insert before input container
-    const inputContainer = this.panel.querySelector('.dsa-input-container');
+    const inputContainer = this.panel.querySelector('.frontable-input-container');
     inputContainer.parentNode.insertBefore(progressElement, inputContainer);
     
     this.scrollToBottom();
@@ -533,23 +661,23 @@ class ChatInterface {
    * Updates step progress
    */
   updateStepProgress(currentStep) {
-    const progressElement = document.getElementById('dsa-step-progress');
+    const progressElement = document.getElementById('frontable-step-progress');
     if (!progressElement) return;
     
-    const steps = progressElement.querySelectorAll('.dsa-step');
-    const counter = progressElement.querySelector('.dsa-steps-counter');
+    const steps = progressElement.querySelectorAll('.frontable-step');
+    const counter = progressElement.querySelector('.frontable-steps-counter');
     
     steps.forEach((step, index) => {
-      const icon = step.querySelector('.dsa-step-icon');
+      const icon = step.querySelector('.frontable-step-icon');
       
       if (index < currentStep) {
-        step.className = 'dsa-step dsa-step-completed';
+        step.className = 'frontable-step frontable-step-completed';
         icon.textContent = '✅';
       } else if (index === currentStep) {
-        step.className = 'dsa-step dsa-step-current';
+        step.className = 'frontable-step frontable-step-current';
         icon.textContent = '⚡';
       } else {
-        step.className = 'dsa-step dsa-step-pending';
+        step.className = 'frontable-step frontable-step-pending';
         icon.textContent = '⏳';
       }
     });
@@ -565,7 +693,7 @@ class ChatInterface {
    * Removes step progress
    */
   removeStepProgress() {
-    const progressElement = document.getElementById('dsa-step-progress');
+    const progressElement = document.getElementById('frontable-step-progress');
     if (progressElement) {
       progressElement.remove();
     }
