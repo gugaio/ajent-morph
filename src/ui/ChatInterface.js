@@ -21,39 +21,39 @@ class ChatInterface {
     
     this.panel.innerHTML = `
       <div class="frontable-chat-header">
-        <div>
-          <div class="frontable-title">Frontable</div>
-        </div>
-        <button class="frontable-close-btn">×</button>
+      <div>
+        <div class="frontable-title">Frontable</div>
+      </div>
+      <button class="frontable-close-btn">×</button>
       </div>
       
       <div class="frontable-messages"></div>
       
       <div class="frontable-task-progress" style="display: none;">
-        <div class="frontable-task-header">
-          <span class="frontable-task-title">🎯 Plano de Execução</span>
-          <span class="frontable-task-stats">0/0</span>
-        </div>
-        <div class="frontable-task-list"></div>
+      <div class="frontable-task-header">
+        <span class="frontable-task-title">🎯 Execution Plan</span>
+        <span class="frontable-task-stats">0/0</span>
+      </div>
+      <div class="frontable-task-list"></div>
       </div>
       
       <div class="frontable-input-container">
-        <div class="frontable-input-wrapper">
-          <textarea 
-            class="frontable-input" 
-            placeholder="Descreva o que você quer fazer..."
-            rows="1"
-          ></textarea>
-          <button class="frontable-send-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-            </svg>
-          </button>
-        </div>
-        <div class="frontable-image-hint">💡 Dica: Use <code>#image</code> para incluir screenshot</div>
-        <div class="frontable-suggestions">
-             <div class="frontable-suggestion frontable-special-suggestion" data-command="Gerar instruções Claude Code">⚡ Instruções para IDE</div>
-        </div>
+      <div class="frontable-input-wrapper">
+        <textarea 
+        class="frontable-input" 
+        placeholder="Describe what you want to do..."
+        rows="1"
+        ></textarea>
+        <button class="frontable-send-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+        </button>
+      </div>
+      <div class="frontable-image-hint">💡 Tip: Use <code>#image</code> to include a screenshot</div>
+      <div class="frontable-suggestions">
+         <div class="frontable-suggestion frontable-special-suggestion" data-command="Generate Claude Code instructions">⚡ Generate prompt to code agent</div>
+      </div>
       </div>
     `;
     

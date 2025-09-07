@@ -57,6 +57,19 @@ module.exports = (env, argv) => {
             isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
             'css-loader'
           ]
+        },
+        {
+          test: /\.(png|svg|jpg|jpeg|gif)$/i,
+          use: [
+            {
+              loader: 'file-loader',
+              options: {
+                outputPath: 'assets/images/',
+                publicPath: 'assets/images/',
+                name: '[name].[ext]'
+              }
+            }
+          ]
         }
       ]
     },

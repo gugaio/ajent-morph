@@ -2,6 +2,7 @@ import ChatInterface from '../ui/ChatInterface';
 import ElementSelector from './ElementSelector';
 import CommandProcessor from './CommandProcessor';
 import VisualContextManager from '../utils/VisualContextManager';
+import logo50 from '../assets/images/logo50.png';
 
 class Frontable {
   constructor(options = {}) {
@@ -30,6 +31,9 @@ class Frontable {
     this.elementSelector.onSelectionChange = (elements) => {
       this.chatInterface.showSelectionPreview(elements);
     };
+    
+    // Create floating button
+    this.createFloatingButton();
   }
   
   handleKeydown(e) {
@@ -61,11 +65,144 @@ class Frontable {
     }
   }
   
+  createFloatingButton() {
+    // Create floating button container
+    this.floatingButton = document.createElement('div');
+    this.floatingButton.className = 'frontable-floating-btn';
+    
+    // Create button element
+    const button = document.createElement('button');
+    button.className = 'frontable-btn';
+    button.setAttribute('aria-label', 'Abrir Frontable');
+    button.setAttribute('title', 'Clique para ativar o Frontable');
+    
+    // Create image element
+    const img = document.createElement('img');
+    img.src = logo50;
+    img.alt = 'Frontable Logo';
+    img.className = 'frontable-logo';
+    
+    // Assemble elements
+    button.appendChild(img);
+    this.floatingButton.appendChild(button);
+    
+    // Add click handler
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.toggleActivation();
+    });
+    
+    // Add styles
+    this.addFloatingButtonStyles();
+    
+    // Add to page
+    document.body.appendChild(this.floatingButton);
+  }
+  
+  addFloatingButtonStyles() {
+    // Check if styles already exist
+    if (document.getElementById('frontable-floating-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'frontable-floating-styles';
+    style.textContent = `
+      .frontable-floating-btn {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        opacity: 1;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.12));
+      }
+      
+      .frontable-floating-btn:hover {
+        transform: translateY(-2px);
+        filter: drop-shadow(0 12px 48px rgba(0, 0, 0, 0.15));
+      }
+      
+      .frontable-btn {
+        width: 64px;
+        height: 64px;
+        border: none;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
+        transition: all 0.3s ease;
+        padding: 0;
+        overflow: hidden;
+        position: relative;
+      }
+      
+      .frontable-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 30px rgba(102, 126, 234, 0.35);
+      }
+      
+      .frontable-btn:active {
+        transform: scale(0.95);
+      }
+      
+      .frontable-logo {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+      }
+      
+      .frontable-btn:hover .frontable-logo {
+        transform: rotate(5deg);
+      }
+      
+      .frontable-floating-btn.active .frontable-btn {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+        box-shadow: 0 6px 30px rgba(255, 107, 107, 0.35);
+      }
+      
+      @media (max-width: 768px) {
+        .frontable-floating-btn {
+          bottom: 20px;
+          right: 20px;
+        }
+        
+        .frontable-btn {
+          width: 56px;
+          height: 56px;
+        }
+        
+        .frontable-logo {
+          width: 32px;
+          height: 32px;
+        }
+      }
+    `;
+    
+    document.head.appendChild(style);
+  }
+  
+  toggleActivation() {
+    if (this.isActive) {
+      this.deactivate();
+    } else {
+      this.activate();
+    }
+  }
+  
   activate() {
     if (this.isActive) return;
     
     console.log('🚀 Frontable activated!');
     this.isActive = true;
+    
+    // Update floating button state
+    if (this.floatingButton) {
+      this.floatingButton.classList.add('active');
+    }
     
     this.chatInterface.show();
     this.elementSelector.enable();
@@ -84,6 +221,11 @@ class Frontable {
     
     console.log('❌ Frontable deactivated');
     this.isActive = false;
+    
+    // Update floating button state
+    if (this.floatingButton) {
+      this.floatingButton.classList.remove('active');
+    }
     
     this.chatInterface.hide();
     this.elementSelector.disable();

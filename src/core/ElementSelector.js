@@ -72,10 +72,10 @@ class ElementSelector {
     
     console.log(`🔧 ElementSelector [${this.instanceId}]: Adding global event listeners...`);
     
-    // Add the global handlers to document
+    // Add the global handlers to document with capture flag for better event interception
     document.addEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
     document.addEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
-    document.addEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick);
+    document.addEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick, true); // Use capture phase
     
     console.log(`✅ ElementSelector [${this.instanceId}]: Enabled successfully as active instance`);
   }
@@ -106,14 +106,10 @@ class ElementSelector {
   removeGlobalListeners() {
     console.log('🧹 ElementSelector: Removing global event listeners...');
     
-    // Remove the global handlers
+    // Remove the global handlers (both bubble and capture phases)
     document.removeEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
     document.removeEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
     document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick);
-    
-    // Also try with capture flag
-    document.removeEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver, true);
-    document.removeEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut, true);
     document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick, true);
     
     console.log('🧹 ElementSelector: Global listeners removed');
@@ -159,8 +155,27 @@ class ElementSelector {
     
     console.log(`🖱️ ElementSelector [${this.instanceId}]: Processing click on`, e.target.tagName);
     
+    // More aggressive event prevention for clickable elements
     e.preventDefault();
     e.stopPropagation();
+    e.stopImmediatePropagation(); // Prevents other listeners on the same element
+    
+    // Additional safety for clickable elements
+    const isClickableElement = e.target.tagName.toLowerCase() === 'button' || 
+                              e.target.tagName.toLowerCase() === 'a' ||
+                              e.target.type === 'submit' ||
+                              e.target.type === 'button' ||
+                              e.target.onclick ||
+                              e.target.getAttribute('onclick') ||
+                              e.target.closest('button, a, [onclick], [role="button"], input[type="submit"], input[type="button"]');
+    
+    if (isClickableElement) {
+      console.log('🚫 Prevented default action on clickable element:', e.target);
+      // Force return false for extra safety
+      setTimeout(() => {
+        e.target.blur(); // Remove focus to prevent space/enter activation
+      }, 0);
+    }
     
     if (this.multipleSelectionEnabled && e.shiftKey) {
       // Handle multiple selection with Shift+Click
@@ -173,6 +188,8 @@ class ElementSelector {
       // Original single selection mode
       this.selectElement(e.target);
     }
+    
+    return false; // Extra safety measure
   }
   
   showOverlay(element) {
