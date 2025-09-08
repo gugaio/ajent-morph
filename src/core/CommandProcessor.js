@@ -23,7 +23,6 @@ class CommandProcessor {
       this.squad = new Squad({
         agents,
         apiToken: apiToken,
-        apiUrl: 'http://localhost:5000',
         model: 'gpt-5-mini',
       });
       //apiUrl: 'http://localhost:5000'
@@ -187,13 +186,10 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         noElementsSelected: true
       };
     }
-
+    
     try {
       // Convert elements to selectors to avoid serialization issues
       const elementSelectors = elements.map(element => {
-        if (this.squad && this.squad.agents && this.squad.agents[0]) {
-          return this.squad.agents[0].getElementSelector(element);
-        }
         // Fallback selector generation
         if (element.id) return `#${element.id}`;
         if (element.className) {

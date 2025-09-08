@@ -1,5 +1,5 @@
 // Global event handler that all ElementSelector instances will use
-window.DSA_GLOBAL_HANDLER = null;
+window.FRONTABLE_GLOBAL_HANDLER = null;
 
 class ElementSelector {
   constructor() {
@@ -20,25 +20,25 @@ class ElementSelector {
   
   setupGlobalHandler() {
     // Create a single global handler that routes to the active instance
-    if (!window.DSA_GLOBAL_HANDLER) {
-      window.DSA_GLOBAL_HANDLER = {
+    if (!window.FRONTABLE_GLOBAL_HANDLER) {
+      window.FRONTABLE_GLOBAL_HANDLER = {
         activeInstance: null,
         
         handleGlobalMouseOver: (e) => {
-          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
-            window.DSA_GLOBAL_HANDLER.activeInstance.handleMouseOver(e);
+          if (window.FRONTABLE_GLOBAL_HANDLER.activeInstance) {
+            window.FRONTABLE_GLOBAL_HANDLER.activeInstance.handleMouseOver(e);
           }
         },
         
         handleGlobalMouseOut: (e) => {
-          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
-            window.DSA_GLOBAL_HANDLER.activeInstance.handleMouseOut(e);
+          if (window.FRONTABLE_GLOBAL_HANDLER.activeInstance) {
+            window.FRONTABLE_GLOBAL_HANDLER.activeInstance.handleMouseOut(e);
           }
         },
         
         handleGlobalClick: (e) => {
-          if (window.DSA_GLOBAL_HANDLER.activeInstance) {
-            window.DSA_GLOBAL_HANDLER.activeInstance.handleClick(e);
+          if (window.FRONTABLE_GLOBAL_HANDLER.activeInstance) {
+            window.FRONTABLE_GLOBAL_HANDLER.activeInstance.handleClick(e);
           }
         }
       };
@@ -68,14 +68,14 @@ class ElementSelector {
     this.multipleSelectionEnabled = true; // Always enable multiple selection
     
     // Set this instance as the active one
-    window.DSA_GLOBAL_HANDLER.activeInstance = this;
+    window.FRONTABLE_GLOBAL_HANDLER.activeInstance = this;
     
     console.log(`🔧 ElementSelector [${this.instanceId}]: Adding global event listeners...`);
     
     // Add the global handlers to document with capture flag for better event interception
-    document.addEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
-    document.addEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
-    document.addEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick, true); // Use capture phase
+    document.addEventListener('mouseover', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalMouseOver);
+    document.addEventListener('mouseout', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalMouseOut);
+    document.addEventListener('click', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalClick, true); // Use capture phase
     
     console.log(`✅ ElementSelector [${this.instanceId}]: Enabled successfully as active instance`);
   }
@@ -88,8 +88,8 @@ class ElementSelector {
     console.log(`🔧 ElementSelector [${this.instanceId}]: Disabling...`);
     
     // Remove this instance as active
-    if (window.DSA_GLOBAL_HANDLER.activeInstance === this) {
-      window.DSA_GLOBAL_HANDLER.activeInstance = null;
+    if (window.FRONTABLE_GLOBAL_HANDLER.activeInstance === this) {
+      window.FRONTABLE_GLOBAL_HANDLER.activeInstance = null;
       console.log(`🎯 ElementSelector [${this.instanceId}]: Deactivated as active instance`);
     }
     
@@ -107,10 +107,10 @@ class ElementSelector {
     console.log('🧹 ElementSelector: Removing global event listeners...');
     
     // Remove the global handlers (both bubble and capture phases)
-    document.removeEventListener('mouseover', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOver);
-    document.removeEventListener('mouseout', window.DSA_GLOBAL_HANDLER.handleGlobalMouseOut);
-    document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick);
-    document.removeEventListener('click', window.DSA_GLOBAL_HANDLER.handleGlobalClick, true);
+    document.removeEventListener('mouseover', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalMouseOver);
+    document.removeEventListener('mouseout', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalMouseOut);
+    document.removeEventListener('click', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalClick);
+    document.removeEventListener('click', window.FRONTABLE_GLOBAL_HANDLER.handleGlobalClick, true);
     
     console.log('🧹 ElementSelector: Global listeners removed');
   }
@@ -141,7 +141,7 @@ class ElementSelector {
   
   handleClick(e) {
     // Extra safety: check if this is the active instance
-    if (window.DSA_GLOBAL_HANDLER.activeInstance !== this) {
+    if (window.FRONTABLE_GLOBAL_HANDLER.activeInstance !== this) {
       console.warn(`⚠️ ElementSelector [${this.instanceId}]: Click called but not active instance!`);
       return;
     }

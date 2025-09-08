@@ -5,13 +5,10 @@ import ElementSelector from './core/ElementSelector';
 import CommandProcessor from './core/CommandProcessor';
 
 // Auto-initialize when script is loaded in browser
-if (typeof window !== 'undefined') {
-  window.Frontable = Frontable;
-  
-  // Auto-start the agent
+if (typeof window !== 'undefined') {  
   const agent = new Frontable();
-  window.dsAgent = agent;
-  
+  agent.init();
+  window.frontable = agent; // Expose to global scope for easy access
   console.log('🤖 Frontable loaded! Type "frontable" to activate.');
 }
 

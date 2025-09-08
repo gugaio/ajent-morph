@@ -67,6 +67,15 @@ class ChatInterface {
     this.inputField = this.panel.querySelector('.frontable-input');
     const sendBtn = this.panel.querySelector('.frontable-send-btn');
     const closeBtn = this.panel.querySelector('.frontable-close-btn');
+    const inputWrapper = this.panel.querySelector('.frontable-input-wrapper');
+    
+    // Fix for input focus issue: clicking anywhere in wrapper should focus the textarea
+    inputWrapper.addEventListener('click', (e) => {
+      // Only focus if the click wasn't on the send button
+      if (!sendBtn.contains(e.target)) {
+        this.inputField.focus();
+      }
+    });
     
     // Input handling
     this.inputField.addEventListener('keydown', (e) => {

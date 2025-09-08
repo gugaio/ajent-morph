@@ -3,67 +3,132 @@ import ResponseApplier from '../core/ResponseApplier.js';
 
 class UXAgent extends Agent {
   constructor() {
-    super('ux_agent', 'Expert in UX designer, executing DOM manipulation and CSS styling based on natural language commands');
+    super('ux_agent', 'UX/UI Designer especializado em implementação visual instantânea: aplica estilos CSS, gera imagens personalizadas com IA, otimiza layouts e exporta mudanças para desenvolvimento - tudo através de comandos em linguagem natural');
     
     // Initialize ResponseApplier for applying styles and maintaining history
     this.applier = new ResponseApplier();
 
-    this.addTool(new Tool('applyStyles', 'Apply CSS styles to selected elements and return success status. Call with: {"description": "what_will_happen_visually", "styles": {"cssProperty": "value"}, "elementSelectors": ["#id", ".class", "tagname"]}', ({ description, styles, elementSelectors }) => this.applyStylesWrapper({ description, styles, elementSelectors })));
-    this.addTool(new Tool('generateImage', 'Generate an image using OpenAI API and apply it to elements or create new elements with the image. Call with: {"description": "what_image_to_generate", "prompt": "detailed_image_description", "elementSelectors": ["#id", ".class"], "applyAs": "background|element"}', ({ description, prompt, elementSelectors, applyAs }) => this.generateImageWrapper({description, prompt, elementSelectors, applyAs})));
-    this.addTool(new Tool('generateClaudeCodeInstructions', 'Generate instructions for Claude Code IDE to implement frontend changes based on change history. Call without parameters: generateClaudeCodeInstructions()', () => this.generateClaudeCodeInstructions()));
+    this.addTool(new Tool(
+      'applyVisualStyles', 
+      'Aplica estilos CSS aos elementos selecionados na página e retorna o status de sucesso. Use para modificar aparência, layout, cores, tamanhos, etc. Exemplo: {"description": "Mudar cor de fundo para azul e texto para branco", "styles": {"backgroundColor": "#0066cc", "color": "white", "padding": "10px"}, "elementSelectors": ["#header", ".nav-item"]}', 
+      ({ description, styles, elementSelectors }) => this.applyStylesWrapper({ description, styles, elementSelectors })
+    ));
+    
+    this.addTool(new Tool(
+      'createAndApplyImage', 
+      'Gera uma imagem usando IA e a aplica aos elementos especificados como fundo ou cria novos elementos com a imagem. Use para adicionar imagens personalizadas, logos, ilustrações, etc. Exemplo: {"description": "Criar logo da empresa no header", "prompt": "modern minimalist logo with blue and white colors for tech company", "elementSelectors": ["#logo"], "applyAs": "element"}. applyAs pode ser "background" (como fundo) ou "element" (como elemento img)', 
+      ({ description, prompt, elementSelectors, applyAs }) => this.generateImageWrapper({description, prompt, elementSelectors, applyAs})
+    ));
+    
+    this.addTool(new Tool(
+      'generateClaudeCodeInstructions', 
+      'Gera instruções específicas para implementar as mudanças visuais no código do projeto. IMPORTANTE: Esta tool retorna apenas as instruções de implementação. A LLM deve APENAS retornar as instruções geradas, sem executar comandos, propor patches ou realizar implementação adicional. Para diferentes frameworks: React (className, style props), Vue (class, style), CSS tradicional (seletores), Tailwind (classes utilitárias), CSS Modules (styles.className). Use após fazer modificações visuais.', 
+      () => this.generateClaudeCodeInstructions()
+    ));
   }
-
   instruction = () => {
     return `
-  Você é especialista em manipulação do DOM.  
-  Sua função: interpretar comandos do usuário e executar UMA única tool abaixo.
-  
-  ## TOOLS DISPONÍVEIS
-  1. **applyStyles** – Alterar estilo visual de elementos  
-     {
-       "description": "Mudança visual",
-       "styles": { "propriedadeCSS": "valor" },
-       "elementSelectors": ["#id", ".classe"]
-     }
-  
-  2. **generateImage** – Criar imagem e aplicar em elementos ou como novo <img>  
-     {
-       "description": "O que será gerado/aplicado",
-       "prompt": "Prompt detalhado (PT/EN)",
-       "elementSelectors": ["#id", ".classe"], // pode ser []
-       "applyAs": "background" | "element"
-     }
-  
-  3. **generateClaudeCodeInstructions** – Gerar instruções para Claude Code IDE  
-     generateClaudeCodeInstructions()  
-     Retorna JSON com changeHistory e imageDownloads para criar instruções detalhadas.
-  
-  ## REGRAS CRÍTICAS
-  - Apenas **1 tool por comando**.
-  - Use **sempre** "elementSelectors" (array de seletores CSS), **nunca** "selectedElements".
-  - Responder perguntas de **informação** sem usar tools, lendo computedStyles.
-  - Em substituições ("trocar", "substituir"), aplique direto (sem deleteElement).
-  - CSS sempre válido, com unidades corretas quando necessário.
-  
-  ## ⚠️ ERROS COMUNS A EVITAR
-  - ❌ \`selectedElements\` → ✅ Use "elementSelectors": ["#id", ".classe"]  
-  - ❌ CSS inválido: \`"color red"\` → ✅ \`"color": "red"\`  
-  - ❌ Sem unidade: \`"fontSize": "16"\` → ✅ \`"fontSize": "16px"\`  
-  - ❌ Mais de uma tool por comando → ✅ Sempre apenas uma  
-  - ❌ Usar tool para responder cor/tamanho → ✅ Responda com dados do computedStyles
-  
-  ## MAPEAMENTO DE INTENÇÃO
-  - Modificar estilo → applyStyles  
-  - Adicionar/aplicar imagem → generateImage  
-  - Gerar instruções para IDE → generateClaudeCodeInstructions
-  
-  ## EXEMPLOS RÁPIDOS
-  "Deixe o texto azul" → applyStyles({ description: "...", styles: { color: "blue" }, elementSelectors: ["#id"] })
-  
-  "Adicione imagem de gato" → generateImage({ description: "...", prompt: "cute orange cat", elementSelectors: [], applyAs: "element" })
-  
-  "Gerar instruções Claude Code" → generateClaudeCodeInstructions()
-    `;
+            ## VOCÊ É UM UX/UI DESIGNER ESPECIALIZADO EM IMPLEMENTAÇÃO VISUAL INSTANTÂNEA
+
+            Sua missão: interpretar comandos de design em linguagem natural e executar **UMA ÚNICA TOOL** para implementar mudanças visuais na interface.
+
+            ## 🛠️ ARSENAL DE FERRAMENTAS
+
+            ### 1. **applyVisualStyles** - Modificar Aparência Visual
+            Aplica estilos CSS para alterar cores, tamanhos, posicionamento, etc.
+            \`\`\`json
+            {
+              "description": "Descrição clara da mudança visual",
+              "styles": { "propriedadeCSS": "valor" },
+              "elementSelectors": ["#id", ".classe", "tag"]
+            }
+            \`\`\`
+
+            ### 2. **createAndApplyImage** - Gerar e Aplicar Imagens com IA
+            Cria imagens personalizadas e as aplica como fundo ou elementos.
+            \`\`\`json
+            {
+              "description": "O que será criado e onde aplicado",
+              "prompt": "Descrição detalhada da imagem (português ou inglês)",
+              "elementSelectors": ["#target"], // [] para criar novo elemento
+              "applyAs": "background" | "element"
+            }
+            \`\`\`
+
+            ### 3. generateClaudeCodeInstructions - Exportar para Desenvolvimento
+            Gera **apenas um resumo simplificado das mudanças visuais realizadas** no browser, 
+            em formato de changelog legível para desenvolvedores. 
+            Não deve gerar código pronto nem múltiplas opções de implementação.
+            Exemplo de saída:
+            Realizei essas mudanças no browser e desejo aplicar no código fonte.
+            Resumo das mudanças aplicadas:
+            - Seletor: .mycomponent
+              - De: color: rgb(59, 130, 246) (azul)
+              - Para: color: #ff0000 (vermelho)
+
+            ## ⚡ REGRAS DE OURO
+
+            1. **UMA TOOL POR COMANDO** - Nunca execute múltiplas ferramentas
+            2. **SEMPRE "elementSelectors"** - Nunca use "selectedElements" ou similares
+            3. **CSS VÁLIDO** - Propriedades corretas com unidades quando necessário
+            4. **PERGUNTAS = INFORMAÇÃO** - Responda consultando computedStyles, não use tools
+            5. **SUBSTITUIÇÃO DIRETA** - Em trocas, aplique novo estilo direto (sem deletar)
+
+            ## 🚫 ARMADILHAS COMUNS
+
+            | ❌ ERRO | ✅ CORRETO |
+            |---------|------------|
+            \`| \`"selectedElements"\` | \`"elementSelectors": ["#id"]\` |
+            | \`"color red"\` | \`"color": "red"\` |
+            | \`"fontSize": "16"\` | \`"fontSize": "16px"\` |
+            | Múltiplas tools | Apenas uma tool |
+            | Tool para consulta | Resposta direta com dados |
+
+            ## 🎯 MAPEAMENTO INTELIGENTE
+
+            **MODIFICAR VISUAL** → \`applyVisualStyles\`
+            - "Mude a cor", "Aumente o tamanho", "Centralize"
+
+            **ADICIONAR IMAGENS** → \`createAndApplyImage\`  
+            - "Adicione uma imagem", "Coloque um fundo", "Crie um ícone"
+
+            **GERAR INSTRUCOES DE CÓDIGO** → \`generateClaudeCodeInstructions\`
+            - "Gere instruções", "Exporte mudanças", "Claude Code"
+            - IMPORTANTE: Apenas retorne as instruções geradas, sem executar ou implementar
+
+            **CONSULTAR INFO** → Resposta direta (sem tool)
+            - "Qual a cor atual?", "Que tamanho tem?"
+
+            ## 💡 EXEMPLOS PRÁTICOS
+
+            \`\`\`
+            Usuário: "Deixe o título azul e maior"
+            Ação: applyVisualStyles({
+              description: "Tornar título azul e aumentar tamanho",
+              styles: { color: "blue", fontSize: "24px" },
+              elementSelectors: ["h1"]
+            })
+            \`\`\`
+
+            \`\`\`
+            Usuário: "Adicione um gato fofo como fundo"
+            Ação: createAndApplyImage({
+              description: "Aplicar imagem de gato fofo como fundo",
+              prompt: "cute fluffy orange cat, adorable, high quality",
+              elementSelectors: ["body"],
+              applyAs: "background"
+            })
+            \`\`\`
+
+            ## 🔍 ANTES DE AGIR
+
+            1. **Identifique a intenção**: modificar, criar imagem ou exportar?
+            2. **Selecione a tool adequada**
+            3. **Verifique seletores CSS corretos**
+            4. **Execute com precisão**
+
+            Seja eficiente, preciso e sempre focado na melhor experiência do usuário!
+                `;
   };
 
   async applyStylesWrapper(params) {
@@ -71,7 +136,7 @@ class UXAgent extends Agent {
     
     // Dispatch tool start event for UI feedback
     const toolInfo = {
-      tool: 'applyStyles',
+      tool: 'applyVisualStyles',
       description: params?.description || 'Aplicando modificações de estilo',
       target: params?.elementSelectors?.join(', ') || 'elementos selecionados'
     };
@@ -81,7 +146,9 @@ class UXAgent extends Agent {
     }
     
     if (!params) {
-      throw new Error('Description, styles, and elementSelectors parameters are required');
+      const errorMsg = '❌ ERRO: Parâmetros obrigatórios ausentes (description, styles, elementSelectors)';
+      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+      return errorMsg;
     }
     
     // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
@@ -89,14 +156,31 @@ class UXAgent extends Agent {
     if (params.params && typeof params.params === 'string') {
       try {
         actualParams = JSON.parse(params.params);
-        console.log('Parsed actualParams for applyStyles:', actualParams);
+        console.log('Parsed actualParams for applyVisualStyles:', actualParams);
       } catch (error) {
+        const errorMsg = '❌ ERRO: Falha ao interpretar parâmetros JSON - verifique a sintaxe';
         console.warn('Failed to parse params.params:', error);
-        actualParams = params;
+        this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+        return errorMsg;
       }
     }
     
-    let selectedElements = [];    // Handle new elementSelectors format
+    // Validate required parameters
+    if (!actualParams.styles || typeof actualParams.styles !== 'object') {
+      const errorMsg = '❌ ERRO: Parâmetro "styles" é obrigatório e deve ser um objeto CSS válido';
+      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+      return errorMsg;
+    }
+    
+    if (!actualParams.elementSelectors || !Array.isArray(actualParams.elementSelectors)) {
+      const errorMsg = '❌ ERRO: Parâmetro "elementSelectors" é obrigatório e deve ser um array de seletores CSS';
+      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+      return errorMsg;
+    }
+    
+    let selectedElements = [];
+    
+    // Handle new elementSelectors format
     if (actualParams.elementSelectors) {
       console.log('elementSelectors received:', actualParams.elementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(actualParams.elementSelectors);
@@ -105,12 +189,11 @@ class UXAgent extends Agent {
     // Handle legacy selectedElements format (in case it's still used)
     else if (actualParams.selectedElements) {
       console.log('selectedElements received (legacy):', actualParams.selectedElements);
-      // Try to use them directly if they're valid DOM elements
       selectedElements = actualParams.selectedElements.filter(el => 
         el && el.nodeType && el.nodeType === Node.ELEMENT_NODE
       );
     }
-    // Handle case where selectors come from currentElementSelectors (set by CommandProcessor)
+    // Handle case where selectors come from currentElementSelectors
     else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
       console.log('Using currentElementSelectors:', this.currentElementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(this.currentElementSelectors);
@@ -122,69 +205,106 @@ class UXAgent extends Agent {
     }
     
     if (selectedElements.length === 0) {
-      throw new Error('elementSelectors parameter is required. Cannot apply styles without target elements.');
+      const selectors = actualParams.elementSelectors.join(', ');
+      const errorMsg = `❌ ERRO: Nenhum elemento encontrado para os seletores: ${selectors}. Verifique se os seletores CSS estão corretos e os elementos existem na página.`;
+      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+      return errorMsg;
     }
     
-    // Call the main applyStyles method with reconstructed elements
+    // Call the main applyVisualStyles method
     try {
-      const result = await this.applyStyles({
+      const result = await this.applyVisualStyles({
         description: actualParams.description,
         styles: actualParams.styles,
         selectedElements: selectedElements
       });
       
+      // Create detailed success message
+      const appliedStyles = Object.entries(actualParams.styles)
+        .map(([prop, value]) => `${prop}: ${value}`)
+        .join(', ');
+      
+      const successMsg = `SUCESSO: Estilos aplicados com sucesso!
+📍 Elementos afetados: ${selectedElements.length} elemento(s) [${actualParams.elementSelectors.join(', ')}]
+🎨 Estilos aplicados: ${appliedStyles}
+📝 Descrição: ${actualParams.description || 'Modificação de estilo'}`;
+      
       // Dispatch success event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('ajentToolSuccess', {
           detail: {
-            tool: 'applyStyles',
-            result: result
+            tool: 'applyVisualStyles',
+            result: successMsg,
+            elementsCount: selectedElements.length,
+            styles: actualParams.styles
           }
         }));
       }
       
-      return result;
+      return successMsg;
+      
     } catch (error) {
+      const errorMsg = `❌ ERRO na aplicação de estilos: ${error.message}
+🔍 Elementos alvo: ${actualParams.elementSelectors.join(', ')}
+🎨 Estilos tentados: ${JSON.stringify(actualParams.styles, null, 2)}`;
+      
       // Dispatch error event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('ajentToolError', {
-          detail: {
-            tool: 'applyStyles',
-            error: error.message
-          }
-        }));
-      }
-      throw error;
+      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
+      return errorMsg;
+    }
+  }
+
+  // Helper method for error events
+  dispatchErrorEvent(tool, errorMsg) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ajentToolError', {
+        detail: { tool, error: errorMsg }
+      }));
     }
   }
 
   async generateClaudeCodeInstructions(params) {
-    // Return raw change history for LLM to process
     console.log('generateClaudeCodeInstructions called with params:', params);
     
     try {
-      // Get raw change history from ResponseApplier
       const history = this.applier.getHistory();
-      
+  
       if (!history || history.length === 0) {
-        return 'No changes made yet. Make some modifications first before requesting instructions.';
+        return 'Nenhuma modificação foi feita ainda. Faça algumas alterações primeiro antes de solicitar as instruções.';
       }
-      
-      // Return processed history data as JSON string for LLM to analyze
-      const historyData = {
-        changeHistory: history,
-        totalChanges: history.length,
-        message: `Raw change history with ${history.length} modifications ready for Claude Code instruction generation.`
-      };
-      
-      return JSON.stringify(historyData, null, 2);
-      
+  
+      let instructions = `Realizei essas mudanças no browser e desejo aplicar no código fonte.\n\n`;
+      instructions += `Resumo das mudanças aplicadas:\n`;
+  
+      history.forEach((change) => {
+        if (change.elementInfo?.selector && change.styles) {
+          const selector = change.elementInfo.selector;
+          
+          Object.entries(change.styles).forEach(([prop, value]) => {
+            const cssProp = prop.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
+  
+            // opcional: recuperar valor anterior, se disponível
+            const from = change.previousStyles?.[prop] || '(valor anterior desconhecido)';
+            const to = value;
+  
+            instructions += `- Seletor: ${selector}\n`;
+            instructions += `  - De: ${cssProp}: ${from}\n`;
+            instructions += `  - Para: ${cssProp}: ${to}\n`;
+          });
+        }
+  
+        if (change.imageUrl) {
+          instructions += `- Imagem gerada: ${change.imageUrl}\n`;
+        }
+      });
+  
+      return instructions;
+  
     } catch (error) {
-      console.error('Error getting change history:', error);
-      return `Failed to get change history: ${error.message}`;
+      console.error('Error generating Claude Code instructions:', error);
+      return `Erro ao gerar instruções: ${error.message}`;
     }
   }
-
 
   async generateImageWrapper(params) {
     console.log('generateImageWrapper called with params:', params);
@@ -198,7 +318,7 @@ class UXAgent extends Agent {
     if (params.params && typeof params.params === 'string') {
       try {
         actualParams = JSON.parse(params.params);
-        console.log('Parsed actualParams for generateImage:', actualParams);
+        console.log('Parsed actualParams for createAndApplyImage:', actualParams);
       } catch (error) {
         console.warn('Failed to parse params.params:', error);
         actualParams = params;
@@ -225,7 +345,7 @@ class UXAgent extends Agent {
       throw new Error('Prompt parameter is required for image generation');
     }
     
-    return this.generateImage({
+    return this.createAndApplyImage({
       description: actualParams.description,
       prompt: actualParams.prompt,
       elementSelectors: elementSelectors,
@@ -233,7 +353,7 @@ class UXAgent extends Agent {
     });
   }
 
-  async generateImage(params) {
+  async createAndApplyImage(params) {
     const { description, prompt, elementSelectors = [], applyAs = 'background' } = params;
     
     if (!description) {
@@ -315,7 +435,7 @@ class UXAgent extends Agent {
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat'
               }
-            }, element, `generateImage: ${description}`);
+            }, element, `createAndApplyImage: ${description}`);
             
             successCount++;
           } catch (error) {
@@ -347,7 +467,7 @@ class UXAgent extends Agent {
           styles: {},
           html: imgElement.outerHTML,
           imageUrl: imageUrl
-        }, imgElement, `generateImage: ${description}`);
+        }, imgElement, `createAndApplyImage: ${description}`);
         
         return `✅ Imagem gerada e elemento criado: ${description}. Nova imagem adicionada à página. URL: ${imageUrl}`;
       }
@@ -418,6 +538,57 @@ class UXAgent extends Agent {
       .replace(/\+/g, '\\+');
   }
 
+  generateTailwindHints(styles) {
+    const tailwindMap = {
+      // Colors
+      'color': {
+        '#ff0000': 'text-red-500', '#ef4444': 'text-red-500', 'red': 'text-red-500',
+        '#3b82f6': 'text-blue-500', '#0066cc': 'text-blue-600', 'blue': 'text-blue-500',
+        '#10b981': 'text-green-500', 'green': 'text-green-500',
+        '#000000': 'text-black', 'black': 'text-black',
+        '#ffffff': 'text-white', 'white': 'text-white'
+      },
+      'backgroundColor': {
+        '#ff0000': 'bg-red-500', '#ef4444': 'bg-red-500', 'red': 'bg-red-500',
+        '#3b82f6': 'bg-blue-500', '#0066cc': 'bg-blue-600', 'blue': 'bg-blue-500',
+        '#10b981': 'bg-green-500', 'green': 'bg-green-500',
+        '#000000': 'bg-black', 'black': 'bg-black',
+        '#ffffff': 'bg-white', 'white': 'bg-white'
+      },
+      // Font sizes
+      'fontSize': {
+        '12px': 'text-xs', '14px': 'text-sm', '16px': 'text-base',
+        '18px': 'text-lg', '20px': 'text-xl', '24px': 'text-2xl',
+        '30px': 'text-3xl', '36px': 'text-4xl'
+      },
+      // Font weight
+      'fontWeight': {
+        '100': 'font-thin', '200': 'font-extralight', '300': 'font-light',
+        '400': 'font-normal', '500': 'font-medium', '600': 'font-semibold',
+        '700': 'font-bold', '800': 'font-extrabold', '900': 'font-black'
+      },
+      // Text alignment
+      'textAlign': {
+        'left': 'text-left', 'center': 'text-center', 'right': 'text-right'
+      },
+      // Display
+      'display': {
+        'block': 'block', 'inline': 'inline', 'flex': 'flex',
+        'grid': 'grid', 'none': 'hidden'
+      }
+    };
+
+    const hints = [];
+    Object.entries(styles).forEach(([prop, value]) => {
+      const normalizedValue = String(value).toLowerCase();
+      if (tailwindMap[prop] && tailwindMap[prop][normalizedValue]) {
+        hints.push(tailwindMap[prop][normalizedValue]);
+      }
+    });
+
+    return hints;
+  }
+
   async validateStylesWrapper(params) {
     console.log('validateStylesWrapper called with params:', params);
     
@@ -447,10 +618,10 @@ class UXAgent extends Agent {
     throw new Error('Invalid styles format');
   }
   
-  async applyStyles(params) {
+  async applyVisualStyles(params) {
     // Defensive parameter validation
     if (!params) {
-      console.error('applyStyles called with undefined params');
+      console.error('applyVisualStyles called with undefined params');
       return JSON.stringify({
         status: 'error',
         message: 'Parameters object is required',
@@ -462,7 +633,7 @@ class UXAgent extends Agent {
     const { description, styles, selectedElements = [] } = params;
 
     if (!description) {
-      console.error('applyStyles called without description:', params);
+      console.error('applyVisualStyles called without description:', params);
       return JSON.stringify({
         status: 'error',
         message: 'Description parameter is required',
@@ -472,7 +643,7 @@ class UXAgent extends Agent {
     }
 
     if (!styles) {
-      console.error('applyStyles called without styles:', params);
+      console.error('applyVisualStyles called without styles:', params);
       return JSON.stringify({
         status: 'error',
         message: 'Styles parameter is required',
@@ -529,7 +700,7 @@ class UXAgent extends Agent {
             explanation: description
           },
           element,
-          `applyStyles: ${description}`
+          `applyVisualStyles: ${description}`
         );
 
         if (result.success) {
