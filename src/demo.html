@@ -34,7 +34,6 @@
             background-color: rgba(255, 255, 255, 0.6);
             -webkit-backdrop-filter: blur(8px);
             backdrop-filter: blur(8px);
-            border-bottom: 1px solid rgba(229, 231, 235, 1);
             transition: background-color 0.2s ease, backdrop-filter 0.2s ease;
         }
 
@@ -48,10 +47,15 @@
             backdrop-filter: none !important;
         }
 
-        .logo {
-            font-size: 18px;
+        nav .logo {
+            color: #111827;
+            font-size: 22px;
             font-weight: 700;
-            color: #16a34a;
+            letter-spacing: 0.4px;
+            line-height: 28px;
+            margin-right: 24px;
+            padding: 8px 0;
+            text-decoration: none;
         }
 
         .nav-links {
@@ -75,21 +79,28 @@
         .hero {
             position: relative;
             height: auto;
-            min-height: 0;
+            min-height: 520px;
             max-height: none;
-            padding: 120px 40px;
+            padding: clamp(32px, 6vw, 120px);
             display: flex;
             flex-direction: column;
             justify-content: center;
-            align-items: flex-start;
-            background-image: linear-gradient(135deg, rgba(79,70,229,0.56) 0%, rgba(16,185,129,0.48) 50%, rgba(236,72,153,0.56) 100%), url("https://frontable.b-cdn.net/images/e81ba733-7970-4517-80e9-e56fe3e1aba5.png");
-            background-size: cover;
-            background-position: center;
+            align-items: center;
+            text-align: center;
+            background-image: linear-gradient(180deg, rgba(5,10,20,0.62), rgba(5,10,20,0.30)), linear-gradient(135deg, rgba(79,70,229,0.56) 0%, rgba(16,185,129,0.48) 50%, rgba(236,72,153,0.56) 100%), url("https://frontable.b-cdn.net/images/e81ba733-7970-4517-80e9-e56fe3e1aba5.png");
+            background-size: cover, cover, cover;
+            background-position: 50% 50%, 50% 50%, 50% 50%;
             background-repeat: no-repeat;
+            background-blend-mode: overlay, normal, normal;
             font-size: 18px;
             line-height: 1.45;
+            letter-spacing: 0.01em;
             box-sizing: border-box;
-            color: #ffffff;
+            color: #F8FAFC;
+            box-shadow: inset 0 60px 100px rgba(0,0,0,0.45);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: saturate(1.05) blur(4px);
+            -webkit-backdrop-filter: saturate(1.05) blur(4px);
         }
 
         .hero::before {
@@ -716,35 +727,13 @@
     </header>
 
     <main>
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="container">
-                <div class="hero-content">
-                    <div class="hero-text">
-                        <h1>Your first <span class="highlight">UX copilot</span></h1>
-                        <p>Turn POs and Designers into active co-creators of their products. Vibe coding enables direct participation in site evolution - real-time, in-browser.</p>
-                        
-                        <div class="cta-buttons">
-                            <a href="#video" class="btn-primary">Ver Demo</a>
-                            <a href="#how-it-works" class="btn-secondary">Como Funciona</a>
-                        </div>
-
-                        <div class="activation-demo">
-                            <div class="demo-text">💡 Ativação simples:</div>
-                            <div class="demo-command">
-                                Digite '<span class="typing-animation">frontable</span>' a qualquer momento e experimente
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+       
 
         <!-- Video Section -->
         <section class="video-section" id="video">
             <div class="container">
-                <h2>Veja o Frontable em Ação</h2>
-                <p>Descubra como é simples transformar qualquer página web usando apenas comandos em linguagem natural. Uma revolução na forma de interagir com o design.</p>
+                <h2>Seu UX copilot</h2>
+                <p>Transforme páginas web instantaneamente com comandos naturais. Interface intuitiva que conecta criatividade humana à precisão da IA em tempo real.</p>
                 
                 <div class="video-container">
                     <div class="video-placeholder">
@@ -802,56 +791,6 @@
                         </div>
                     </div>
                     
-                    <div class="feature-card">
-                        <div class="feature-image">
-                            🎨
-                            <div class="mockup-elements">
-                                <div class="mockup-element">Botão</div>
-                                <div class="mockup-element">Form</div>
-                                <div class="mockup-element">Card</div>
-                            </div>
-                        </div>
-                        <div class="feature-content">
-                            <h3>Criação de Elementos Interativos</h3>
-                            <p>Crie formulários, botões e componentes complexos apenas descrevendo o que você quer.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-image">
-                            🔧
-                            <div class="mockup-tools">
-                                <div class="mockup-tool">Style</div>
-                                <div class="mockup-tool">Create</div>
-                                <div class="mockup-tool">Behavior</div>
-                                <div class="mockup-tool">Analyze</div>
-                            </div>
-                        </div>
-                        <div class="feature-content">
-                            <h3>Sistema de Ferramentas Completo</h3>
-                            <p>Ferramentas especializadas para estilos, criação, comportamentos e análise de elementos.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <div class="feature-image">
-                            ↩️
-                            <div class="mockup-history">
-                                <div class="history-item">
-                                    <span>↩️</span>
-                                    <span>Cor alterada</span>
-                                </div>
-                                <div class="history-item">
-                                    <span>➕</span>
-                                    <span>Botão criado</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="feature-content">
-                            <h3>Histórico e Desfazer</h3>
-                            <p>Sistema completo de undo/redo. Todas as modificações podem ser desfeitas com segurança.</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </section>
