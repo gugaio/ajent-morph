@@ -391,10 +391,47 @@ class ElementSelector {
   }
 
   getElementId(element) {
-    // Create a unique identifier for the element
-    if (element.id) return element.id;
-    if (element.className) return element.className.replace(/\s+/g, '-');
-    return element.tagName + '-' + Array.from(element.parentNode.children).indexOf(element);
+    // Create a unique CSS selector path for the element
+    if (element.id) return `#${element.id}`;
+    // Build a complete CSS path
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body && current !== document.documentElement) {
+      let selector = current.tagName.toLowerCase();
+      
+      // Add class if available
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\s+/).filter(cls => cls);
+        if (classes.length > 0) {
+          selector += '.' + classes.join('.');
+        }
+      }
+      
+      // Add nth-child if no unique identifier
+      if (!current.id && (!current.className || !current.className.trim())) {
+        const siblings = Array.from(current.parentNode?.children || []);
+        const sameTagSiblings = siblings.filter(sibling => 
+          sibling.tagName.toLowerCase() === current.tagName.toLowerCase()
+        );
+        
+        if (sameTagSiblings.length > 1) {
+          const index = sameTagSiblings.indexOf(current) + 1;
+          selector += `:nth-of-type(${index})`;
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentNode;
+      
+      // Stop if we have a unique identifier
+      if (current && current.id) {
+        path.unshift(`#${current.id}`);
+        break;
+      }
+    }
+    
+    return path.join(' > ');
   }
 
   getMultiSelectedElements() {

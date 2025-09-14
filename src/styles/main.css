@@ -4,7 +4,7 @@
   bottom: 100px !important;
   right: -400px !important;
   width: 380px !important;
-  height: 500px !important;
+  height: 700px !important;
   max-height: calc(100vh - 140px) !important;
   background: white !important;
   border-radius: 16px !important;
@@ -34,6 +34,12 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 16px 16px 0 0;
+}
+
+.frontable-tool-progress{
+  background-color: #bde9e9;
+    padding: 10px;
+    border-radius: 15px;
 }
 
 .frontable-title {
@@ -420,10 +426,13 @@
 /* Task Progress Interface */
 .frontable-task-progress {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 15px;
   margin: 8px 12px;
-  background: #f8fafc;
+  background-color: #c9e6e5;
   overflow: hidden;
+  opacity: 0.6;
+  transform: scale(0.95);
+  padding: 8px;
 }
 
 .frontable-task-header {

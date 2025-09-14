@@ -209,7 +209,7 @@ class Frontable {
     setTimeout(() => {
       this.chatInterface.addMessage({
         type: 'agent',
-        content: 'Olá! Clique em qualquer elemento da página e me diga o que quer fazer.\n\n💡 Shift+Click para seleção múltipla'
+        content: 'Clique em qualquer elemento da página e me diga o que quer fazer'
       });
     }, 500);
   }
@@ -294,9 +294,7 @@ class Frontable {
           content: message
         });
       }
-
-      // Show typing indicator
-      this.chatInterface.showTyping();
+      
 
       if (typeof cleanMessage === 'string' && cleanMessage.trim().toLowerCase() === 'undo') {
         const undoResult = await this.undoLastChange();
@@ -359,18 +357,7 @@ class Frontable {
         selectedElements: selectedElements,
         mode: 'intelligent_decision',
         visualContext: visualContext
-      }, (llmResponse) => {
-        // Show typing indicator during processing
-        this.chatInterface.addMessage(
-          {
-            type: 'agent',
-            content: llmResponse.message || 'Processando...'
-          }
-        );
       });
-      
-      // Hide typing
-      this.chatInterface.hideTyping();
       
       // Show result
       this.chatInterface.addMessage({

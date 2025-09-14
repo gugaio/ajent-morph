@@ -396,7 +396,7 @@ class ChatInterface {
       'generateClaudeCodeInstructions': 'Gerar Instruções IDE',
       'planTask': 'Planejar Tarefas'
     };
-    return names[toolName] || 'Executar Ferramenta';
+    return ('Tool:' + names[toolName]) || 'Executar Ferramenta';
   }
   
   scrollToBottom() {
@@ -423,7 +423,7 @@ class ChatInterface {
       <div class="frontable-preview-list">
         ${elements.map((el, index) => `
           <div class="frontable-preview-item">
-            ${index + 1}. ${el.tagName.toLowerCase()}${el.className ? '.' + el.className.split(' ')[0] : ''}${el.id ? '#' + el.id : ''}
+            ${index + 1}. ${this.generateElementSelectorDisplay(el)}
           </div>
         `).join('')}
       </div>
@@ -706,6 +706,58 @@ class ChatInterface {
     if (progressElement) {
       progressElement.remove();
     }
+  }
+
+  /**
+   * Generate a display-friendly element selector with full CSS path
+   * @param {Element} element - The DOM element
+   * @returns {string} - Display-friendly CSS selector
+   */
+  generateElementSelectorDisplay(element) {
+    // Create a unique CSS selector path for the element
+    if (element.id) return `#${element.id}`;
+    
+    // Build a complete CSS path (similar to the other methods)
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body && current !== document.documentElement) {
+      let selector = current.tagName.toLowerCase();
+      
+      // Add class if available (limit to first class for readability)
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\s+/).filter(cls => cls);
+        if (classes.length > 0) {
+          selector += '.' + classes[0]; // Only first class for display
+        }
+      }
+      
+      // Add nth-of-type if no unique identifier
+      if (!current.id && (!current.className || !current.className.trim())) {
+        const siblings = Array.from(current.parentNode?.children || []);
+        const sameTagSiblings = siblings.filter(sibling => 
+          sibling.tagName.toLowerCase() === current.tagName.toLowerCase()
+        );
+        
+        if (sameTagSiblings.length > 1) {
+          const index = sameTagSiblings.indexOf(current) + 1;
+          selector += `:nth-of-type(${index})`;
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentNode;
+      
+      // Stop if we have a unique identifier or if path gets too long (for display purposes)
+      if ((current && current.id) || path.length >= 3) {
+        if (current && current.id) {
+          path.unshift(`#${current.id}`);
+        }
+        break;
+      }
+    }
+    
+    return path.join(' > ');
   }
 }
 

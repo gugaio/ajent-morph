@@ -443,27 +443,55 @@ class ResponseApplier {
   }
     
   getElementSelector(element) {
+    // Create a unique CSS selector path for the element (similar to ElementSelector.getElementId)
     if (element.id) {
       const escapedId = this.escapeCSSIdentifier(element.id);
       return `#${escapedId}`;
     }
-    if (element.className) {
-      const allClasses = element.className.split(' ').filter(c => c);
-      const simpleClasses = this.getSimpleClasses(allClasses);
+    
+    // Build a complete CSS path
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body && current !== document.documentElement) {
+      let selector = current.tagName.toLowerCase();
       
-      if (simpleClasses.length > 0) {
-        const escapedClasses = simpleClasses.slice(0, 2).map(cls => this.escapeCSSIdentifier(cls));
-        return `.${escapedClasses.join('.')}`;
-      } else {
-        // If no simple classes, fall back to nth-child
-        if (element.parentElement) {
-          const siblings = Array.from(element.parentElement.children);
-          const index = siblings.indexOf(element) + 1;
-          return `${element.parentElement.tagName.toLowerCase()} > :nth-child(${index})`;
+      // Add class if available
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\s+/).filter(cls => cls);
+        const simpleClasses = this.getSimpleClasses(classes);
+        
+        if (simpleClasses.length > 0) {
+          const escapedClasses = simpleClasses.slice(0, 2).map(cls => this.escapeCSSIdentifier(cls));
+          selector += '.' + escapedClasses.join('.');
         }
       }
+      
+      // Add nth-of-type if no unique identifier
+      if (!current.id && (!current.className || !current.className.trim())) {
+        const siblings = Array.from(current.parentNode?.children || []);
+        const sameTagSiblings = siblings.filter(sibling => 
+          sibling.tagName.toLowerCase() === current.tagName.toLowerCase()
+        );
+        
+        if (sameTagSiblings.length > 1) {
+          const index = sameTagSiblings.indexOf(current) + 1;
+          selector += `:nth-of-type(${index})`;
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentNode;
+      
+      // Stop if we have a unique identifier
+      if (current && current.id) {
+        const escapedId = this.escapeCSSIdentifier(current.id);
+        path.unshift(`#${escapedId}`);
+        break;
+      }
     }
-    return element.tagName.toLowerCase();
+    
+    return path.join(' > ');
   }
 
   /**

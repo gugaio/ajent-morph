@@ -3,14 +3,156 @@ import ResponseApplier from '../core/ResponseApplier.js';
 
 class UXAgent extends Agent {
   constructor() {
-    super('ux_agent', 'UX/UI Designer especializado em implementação visual instantânea: aplica estilos CSS, gera imagens personalizadas com IA, otimiza layouts e exporta mudanças para desenvolvimento - tudo através de comandos em linguagem natural');
+    super('ux_agent', 'Especialista em implementação visual direta: transforma instruções em linguagem natural em modificações CSS precisas, geração inteligente de imagens e otimização de interfaces em tempo real. Atua como ponte entre concepção e implementação, garantindo fidelidade visual e eficiência técnica.');
     
     // Initialize ResponseApplier for applying styles and maintaining history
     this.applier = new ResponseApplier();
 
     this.addTool(new Tool(
       'applyVisualStyles', 
-      'Aplica estilos CSS aos elementos selecionados na página e retorna o status de sucesso. Use para modificar aparência, layout, cores, tamanhos, etc. Exemplo: {"description": "Mudar cor de fundo para azul e texto para branco", "styles": {"backgroundColor": "#0066cc", "color": "white", "padding": "10px"}, "elementSelectors": ["#header", ".nav-item"]}', 
+      `Aplica estilos CSS de forma precisa e controlada aos elementos selecionados. 
+    
+    ## 📋 OBJETIVO PRINCIPAL
+    Transformar instruções de design em implementação visual imediata através de modificações CSS específicas e semanticamente corretas.
+    
+    ## 🎯 PARÂMETROS DETALHADOS
+    
+    ### description (obrigatório)
+    - Finalidade: Contextualiza a mudança para registro e auditoria
+    - Formato: String descritiva em português
+    - Exemplo: "Aumentar tamanho da fonte do título principal e aplicar cor brand"
+    
+    ### styles (obrigatório)
+    - Finalidade: Objeto JavaScript com propriedades CSS válidas
+    - Convenções: 
+      - Uso de camelCase para propriedades compostas
+      - Valores devem incluir unidades quando aplicável
+      - Cores em formato hexadecimal preferencialmente
+      - Valores devem ser strings sempre
+    
+    ### elementSelectors (obrigatório)
+    - Finalidade: Array de seletores CSS válidos para targeting preciso
+    - Regras: 
+      - Priorizar IDs sobre classes sobre tags
+      - Especificidade adequada para evitar conflitos
+      - Seletores devem ser testáveis e não ambíguos
+    
+    ## ✅ EXEMPLOS POSITIVOS
+    
+    ### Exemplo 1: Modificação Básica
+    \`\`\`json
+    {
+      "description": "Tornar botão primário com cor brand e padding aumentado",
+      "styles": {
+        "backgroundColor": "#0066cc",
+        "color": "#ffffff",
+        "padding": "16px 32px",
+        "borderRadius": "8px",
+        "fontWeight": "600"
+      },
+      "elementSelectors": [".btn-primary"]
+    }
+    \`\`\`
+    
+    ### Exemplo 2: Ajuste de Layout Responsivo
+    \`\`\`json
+    {
+      "description": "Converter container para flexbox com espaçamento otimizado",
+      "styles": {
+        "display": "flex",
+        "flexDirection": "row",
+        "gap": "20px",
+        "justifyContent": "space-between",
+        "alignItems": "center",
+        "maxWidth": "1200px",
+        "margin": "0 auto"
+      },
+      "elementSelectors": ["#main-container"]
+    }
+    \`\`\`
+    
+    ### Exemplo 3: Refinamento Tipográfico
+    \`\`\`json
+    {
+      "description": "Aprimorar hierarquia tipográfica com escala modular",
+      "styles": {
+        "fontFamily": "'Inter', sans-serif",
+        "fontSize": "clamp(1.5rem, 2.5vw, 2.5rem)",
+        "lineHeight": "1.6",
+        "letterSpacing": "-0.02em",
+        "marginBottom": "1.5em"
+      },
+      "elementSelectors": ["h1.hero-title"]
+    }
+    \`\`\`
+    
+    ## ❌ EXEMPLOS NEGATIVOS
+    
+    ### Exemplo 1: Propriedades Inválidas
+    \`\`\`json
+    // ERRADO - propriedade incorreta e valor sem unidade
+    {
+      "description": "Aumentar texto",
+      "styles": {
+        "text-size": "18", // Deveria ser fontSize com px
+        "bg-color": "blue" // Propriedade CSS inexistente
+      },
+      "elementSelectors": [".texto"]
+    }
+    \`\`\`
+    
+    ### Exemplo 2: Seletores Problemáticos
+    \`\`\`json
+    // ERRADO - seletor muito genérico e potencialmente destrutivo
+    {
+      "description": "Mudar cor dos links",
+      "styles": {
+        "color": "red"
+      },
+      "elementSelectors": ["a"] // Afetará TODOS os links da página
+    }
+    \`\`\`
+    
+    ### Exemplo 3: Valores Incorretos
+    \`\`\`json
+    // ERRADO - valores incompletos e formato incorreto
+    {
+      "description": "Adicionar sombra",
+      "styles": {
+        "boxShadow": "black 10px" // Valor incompleto de box-shadow
+      },
+      "elementSelectors": [".card"]
+    }
+    \`\`\`
+    
+    ## 🚨 CENÁRIOS DE USO ESPECÍFICOS
+    
+    ### 1. Overrides de Estilo
+    Use para substituir estilos existentes sem remover completamente a declaração anterior.
+    
+    ### 2. Prototipagem Rápida
+    Ideal para testar variações visuais sem comprometer o código base.
+    
+    ### 3. Correções Emergenciais
+    Ajustes pontuais em produção para hotfixes visuais.
+    
+    ### 4. Experimentação A/B
+    Variações de estilo para testes de usabilidade e conversão.
+    
+    ## 🔧 MELHORES PRÁTICAS
+    
+    1. **Especificidade Controlada**: Use seletores com especificidade adequada
+    2. **Validação Implícita**: Verifique mentalmente a validade CSS antes de aplicar
+    3. **Performance Visual**: Evite propriedades que causam repaint custoso
+    4. **Consistência Semântica**: Mantenha padrões de nomenclatura e valores
+    5. **Fallbacks Progressivos**: Use valores que degradam graciosamente
+    
+    ## ⚠️ LIMITAÇÕES CONHECIDAS
+    
+    - Não aplica pseudo-classes (:hover, :focus)
+    - Não manipula regras @keyframes ou @media queries
+    - Não gerencia variáveis CSS custom properties
+    - Aplicação é imediata e não gradual (sem transições)`,
       ({ description, styles, elementSelectors }) => this.applyStylesWrapper({ description, styles, elementSelectors })
     ));
     
@@ -136,7 +278,7 @@ class UXAgent extends Agent {
     
     // Dispatch tool start event for UI feedback
     const toolInfo = {
-      tool: 'applyVisualStyles',
+      tool: 'applyStyles',
       description: params?.description || 'Aplicando modificações de estilo',
       target: params?.elementSelectors?.join(', ') || 'elementos selecionados'
     };

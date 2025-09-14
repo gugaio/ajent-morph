@@ -62,6 +62,7 @@ class CommandProcessor {
       // Gera contexto para LLM
       const contextPrompt = this.inspector.generateContextPrompt(firstElement, message);
       
+      
       // Tenta chamar LLM primeiro
       let llmResponse = await this.callLLM(contextPrompt);
       // Aplica resposta da LLM
@@ -190,13 +191,7 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
     try {
       // Convert elements to selectors to avoid serialization issues
       const elementSelectors = elements.map(element => {
-        // Fallback selector generation
-        if (element.id) return `#${element.id}`;
-        if (element.className) {
-          const classes = Array.from(element.classList).slice(0, 2);
-          return `.${classes.join('.')}`;
-        }
-        return element.tagName.toLowerCase();
+        return this.generateElementSelector(element);
       }).filter(Boolean);
       
       // Create a context-rich prompt for the LLM that includes element information and selectors
@@ -234,8 +229,17 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
         // Tool progress events are now handled directly in the agent wrappers
       }
 
+      this.chatInterface && this.chatInterface.addMessage({
+        type: 'agent',
+        content: 'Enviando comando para LLM. Isso pode levar alguns instantes... ⏳'
+      });
+ 
+      this.chatInterface.showTyping();
+
       // Use the LLM squad to process the intelligent decision
       const response = await this.callLLM(contextPrompt, visualContext);
+
+      this.chatInterface.hideTyping();
       
       console.log('LLM response for intelligent decision:', response);
 
@@ -367,6 +371,57 @@ Retorne apenas o HTML completo do novo componente, incluindo CSS inline ou class
     }
     
     return toolInfo;
+  }
+
+  /**
+   * Generate a specific CSS selector path for an element
+   * @param {Element} element - The DOM element
+   * @returns {string} - CSS selector path
+   */
+  generateElementSelector(element) {
+    // Create a unique CSS selector path for the element
+    if (element.id) return `#${element.id}`;
+    
+    // Build a complete CSS path
+    const path = [];
+    let current = element;
+    
+    while (current && current !== document.body && current !== document.documentElement) {
+      let selector = current.tagName.toLowerCase();
+      
+      // Add class if available
+      if (current.className && typeof current.className === 'string') {
+        const classes = current.className.trim().split(/\s+/).filter(cls => cls);
+        if (classes.length > 0) {
+          // Use first 2 classes to keep selector manageable
+          selector += '.' + classes.slice(0, 2).join('.');
+        }
+      }
+      
+      // Add nth-of-type if no unique identifier
+      if (!current.id && (!current.className || !current.className.trim())) {
+        const siblings = Array.from(current.parentNode?.children || []);
+        const sameTagSiblings = siblings.filter(sibling => 
+          sibling.tagName.toLowerCase() === current.tagName.toLowerCase()
+        );
+        
+        if (sameTagSiblings.length > 1) {
+          const index = sameTagSiblings.indexOf(current) + 1;
+          selector += `:nth-of-type(${index})`;
+        }
+      }
+      
+      path.unshift(selector);
+      current = current.parentNode;
+      
+      // Stop if we have a unique identifier
+      if (current && current.id) {
+        path.unshift(`#${current.id}`);
+        break;
+      }
+    }
+    
+    return path.join(' > ');
   }
 }
 
