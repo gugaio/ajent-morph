@@ -341,7 +341,7 @@
         /* Video Section */
         .video-section {
             padding: 6rem 0;
-            background: white;
+            background: #f8fafc;
             text-align: center;
         }
 
@@ -352,54 +352,72 @@
             font-weight: 700;
         }
 
-        .video-section p {
+        .video-section-subtitle {
             color: #6b7280;
             font-size: 1.1rem;
-            margin-bottom: 3rem;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+            margin-bottom: 4rem;
+            text-align: center;
         }
 
-        .video-container {
-            max-width: 800px;
-            margin: 0 auto;
-            position: relative;
+        .video-card {
+            background: white;
+            border: 1px solid #e5e7eb;
             border-radius: 1rem;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
-        .video-placeholder {
-            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-            height: 450px;
+        .video-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+            border-color: #3b82f6;
+        }
+
+        .video-image {
+            height: 300px;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            color: #6b7280;
+            font-size: 4rem;
+            color: #3b82f6;
             position: relative;
         }
 
-        .play-button {
-            width: 80px;
-            height: 80px;
-            background: #3b82f6;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 2rem;
+        .video-icon {
+            font-size: 4rem;
             margin-bottom: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+            animation: float 3s ease-in-out infinite;
         }
 
-        .play-button:hover {
-            transform: scale(1.1);
-            box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
+        @keyframes video-float {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-5px) scale(1.05); }
+        }
+
+        .video-icon:hover {
+            animation: video-float 1s ease-in-out infinite;
+        }
+
+        .video-content {
+            padding: 2rem;
+            background: white;
+        }
+
+        .video-content h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #1f2937;
+            font-weight: 600;
+        }
+
+        .video-content p {
+            color: #6b7280;
+            line-height: 1.6;
+            font-size: 1.1rem;
         }
 
         /* Features Section */
@@ -733,13 +751,15 @@
         <section class="video-section" id="video">
             <div class="container">
                 <h2>Seu UX copilot</h2>
-                <p>Transforme páginas web instantaneamente com comandos naturais. Interface intuitiva que conecta criatividade humana à precisão da IA em tempo real.</p>
+                <p class="video-section-subtitle">Transforme páginas web instantaneamente com comandos naturais. Interface intuitiva que conecta criatividade humana à precisão da IA em tempo real.</p>
                 
-                <div class="video-container">
-                    <div class="video-placeholder">
-                        <div class="play-button">▶</div>
-                        <h3 style="color: #1f2937; margin-bottom: 0.5rem;">Demo Completo - 3:42</h3>
-                        <p>Vídeo demonstrando todas as funcionalidades</p>
+                <div class="video-card">
+                    <div class="video-image">
+                        <div class="video-icon">🎬</div>
+                    </div>
+                    <div class="video-content">
+                        <h3>Vídeo demonstrando todas as funcionalidades</h3>
+                        <p>Assista ao demo completo e descubra como o Frontable revoluciona a criação e modificação de interfaces web através de comandos em linguagem natural.</p>
                     </div>
                 </div>
             </div>
@@ -857,6 +877,11 @@
         const typingElement = document.querySelector('.typing-animation');
         
         function typeWriter() {
+            if (!typingElement) {
+                console.warn('typing-animation element not found');
+                return;
+            }
+            
             if (index < text.length) {
                 typingElement.textContent = text.substring(0, index + 1);
                 index++;
@@ -887,9 +912,14 @@
         });
 
         // Video play button interaction
-        document.querySelector('.play-button').addEventListener('click', function() {
-            alert('Aqui seria reproduzido o vídeo demo do Frontable!');
-        });
+        const playButton = document.querySelector('.play-button');
+        if (playButton) {
+            playButton.addEventListener('click', function() {
+                alert('Aqui seria reproduzido o vídeo demo do Frontable!');
+            });
+        } else {
+            console.warn('play-button element not found');
+        }
         
     </script>
     <script src="../dist/frontable.min.js"></script>
