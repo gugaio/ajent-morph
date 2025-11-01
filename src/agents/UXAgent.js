@@ -287,12 +287,6 @@ class UXAgent extends Agent {
       window.dispatchEvent(new CustomEvent('ajentToolStart', { detail: toolInfo }));
     }
     
-    if (!params) {
-      const errorMsg = '❌ ERRO: Parâmetros obrigatórios ausentes (description, styles, elementSelectors)';
-      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-      return errorMsg;
-    }
-    
     // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
     let actualParams = params;
     if (params.params && typeof params.params === 'string') {
@@ -328,22 +322,10 @@ class UXAgent extends Agent {
       selectedElements = this.reconstructElementsFromSelectors(actualParams.elementSelectors);
       console.log('Reconstructed elements:', selectedElements);
     }
-    // Handle legacy selectedElements format (in case it's still used)
-    else if (actualParams.selectedElements) {
-      console.log('selectedElements received (legacy):', actualParams.selectedElements);
-      selectedElements = actualParams.selectedElements.filter(el => 
-        el && el.nodeType && el.nodeType === Node.ELEMENT_NODE
-      );
-    }
     // Handle case where selectors come from currentElementSelectors
     else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
       console.log('Using currentElementSelectors:', this.currentElementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(this.currentElementSelectors);
-    }
-    // Fallback to currentSelectedElements
-    else if (this.currentSelectedElements && this.currentSelectedElements.length > 0) {
-      console.log('Using currentSelectedElements (fallback):', this.currentSelectedElements);
-      selectedElements = this.currentSelectedElements;
     }
     
     if (selectedElements.length === 0) {
@@ -761,47 +743,8 @@ class UXAgent extends Agent {
   }
   
   async applyVisualStyles(params) {
-    // Defensive parameter validation
-    if (!params) {
-      console.error('applyVisualStyles called with undefined params');
-      return JSON.stringify({
-        status: 'error',
-        message: 'Parameters object is required',
-        should_continue: false,
-        data: null
-      });
-    }
 
     const { description, styles, selectedElements = [] } = params;
-
-    if (!description) {
-      console.error('applyVisualStyles called without description:', params);
-      return JSON.stringify({
-        status: 'error',
-        message: 'Description parameter is required',
-        should_continue: false,
-        data: null
-      });
-    }
-
-    if (!styles) {
-      console.error('applyVisualStyles called without styles:', params);
-      return JSON.stringify({
-        status: 'error',
-        message: 'Styles parameter is required',
-        should_continue: false,
-        data: null
-      });
-    }
-
-    if (!selectedElements || selectedElements.length === 0) {
-      return JSON.stringify({
-        status: 'error',
-        message: 'Nenhum elemento selecionado para aplicar estilos.',
-        should_continue: false,
-        data: null
-      });
-    }
 
     // Validate and normalize the provided styles
     const normalizedStyles = this.normalizeStyles(styles);

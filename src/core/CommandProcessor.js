@@ -24,6 +24,7 @@ class CommandProcessor {
         agents,
         apiToken: apiToken,
         model: 'gpt-5-mini',
+        apiUrl: 'http://localhost:5000'
       });
       //apiUrl: 'http://localhost:5000'
       this.hasAI = true;
@@ -42,17 +43,12 @@ class CommandProcessor {
     
     // Only check for selection if we're not in component generation mode
     // Note: intelligent_decision mode can work with or without selected elements
-    if (!firstElement && mode !== 'component_generation' && mode !== 'intelligent_decision') {
+    if (!firstElement) {
       return {
         message: 'Por favor, clique em um elemento da página primeiro para que eu possa editá-lo! 👆'
       };
     }
     try {
-      if (mode === 'component_generation') {
-        // Handle component generation mode
-        return await this.processComponentGeneration(message, elementsData);
-      }
-      
       if (mode === 'intelligent_decision') {
         // Handle intelligent decision mode using DOMManipulationAgent
         return await this.processIntelligentDecision(message, elements, visualContext);
