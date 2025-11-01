@@ -43,12 +43,10 @@ class CommandProcessor {
 
   async processIntelligentDecision(message, elements, visualContext = null) {
     // Special case: Claude Code instructions don't require selected elements
-    const isClaudeCodeRequest = message.toLowerCase().includes('claude code') || 
-                               message.toLowerCase().includes('instruções') && message.toLowerCase().includes('ide') ||
-                               message.toLowerCase().includes('gerar instruções');
+    const isIDEPromptRequest = message.toLowerCase().includes('#ide');
     
     // Check if there are elements selected first, before calling LLM (except for Claude Code instructions)
-    if (!isClaudeCodeRequest && (!elements || elements.length === 0)) {
+    if (!isIDEPromptRequest && (!elements || elements.length === 0)) {
       return {
         message: 'Por favor, selecione um elemento na página antes de executar comandos! 👆',
         success: false,
@@ -63,29 +61,7 @@ class CommandProcessor {
       }).filter(Boolean);
       
       // Create a context-rich prompt for the LLM that includes element information and selectors
-      let contextPrompt = `User command: "${message}"\n\n`;
-      
-      if (isClaudeCodeRequest) {
-        contextPrompt += 'SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n';
-        contextPrompt += 'No elements need to be selected for this request - it works with stored change history only.\n\n';
-      } else if (elements && elements.length > 0) {
-        contextPrompt += 'Selected elements (these will be passed to tools as elementSelectors parameter):\n';
-        elements.forEach((element, index) => {
-          const elementInfo = this.inspector.getElementInfo(element);
-          const selector = elementSelectors[index];
-          contextPrompt += `Element ${index + 1} (selector: ${selector}): ${JSON.stringify(elementInfo, null, 2)}\n`;
-        });
-      } else {
-        contextPrompt += 'No elements selected.\n';
-      }
-
-      // Add visual context if available
-      if (visualContext) {
-        contextPrompt += `\nVisual Context: Screenshot of selected elements provided for better understanding.\n`;
-        contextPrompt += `Visual Description: ${visualContext.description}\n`;
-        contextPrompt += `Screenshot Metadata: ${JSON.stringify(visualContext.metadata, null, 2)}\n\n`;
-        contextPrompt += 'Please analyze both the DOM data and the visual screenshot to provide the best suggestions.\n';
-      }
+      let contextPrompt = this.generateContextPrompt(message, isIDEPromptRequest, elements, elementSelectors, visualContext);
 
       console.log('Sending final prompt to LLM:', contextPrompt);
 
@@ -135,6 +111,33 @@ class CommandProcessor {
       const firstElement = elements && elements.length > 0 ? elements[0] : null;
       return await this.createLocalFallbackResponse(message, firstElement);
     }
+  }
+
+  generateContextPrompt(message, isClaudeCodeRequest, elements, elementSelectors, visualContext) {
+    let contextPrompt = `User command: "${message}"\n\n`;
+
+    if (isClaudeCodeRequest) {
+      contextPrompt += 'SPECIAL REQUEST: Generate Claude Code IDE instructions based on change history.\n';
+      contextPrompt += 'No elements need to be selected for this request - it works with stored change history only.\n\n';
+    } else if (elements && elements.length > 0) {
+      contextPrompt += 'Selected elements (these will be passed to tools as elementSelectors parameter):\n';
+      elements.forEach((element, index) => {
+        const elementInfo = this.inspector.getElementInfo(element);
+        const selector = elementSelectors[index];
+        contextPrompt += `Element ${index + 1} (selector: ${selector}): ${JSON.stringify(elementInfo, null, 2)}\n`;
+      });
+    } else {
+      contextPrompt += 'No elements selected.\n';
+    }
+
+    // Add visual context if available
+    if (visualContext) {
+      contextPrompt += `\nVisual Context: Screenshot of selected elements provided for better understanding.\n`;
+      contextPrompt += `Visual Description: ${visualContext.description}\n`;
+      contextPrompt += `Screenshot Metadata: ${JSON.stringify(visualContext.metadata, null, 2)}\n\n`;
+      contextPrompt += 'Please analyze both the DOM data and the visual screenshot to provide the best suggestions.\n';
+    }
+    return contextPrompt;
   }
 
   undo() {
