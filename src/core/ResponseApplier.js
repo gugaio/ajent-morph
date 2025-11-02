@@ -172,7 +172,7 @@ class ResponseApplier {
       
     // Valida propriedades CSS
     if (response.styles) {
-      Object.keys(response.styles).forEach(prop => {
+      Object.entries(response.styles).forEach(([prop, value]) => {
         const kebabProp = this.camelToKebab(prop);
         const camelProp = this.kebabToCamel(prop);
           
@@ -181,18 +181,12 @@ class ResponseApplier {
               !this.validCSSProperties.has(camelProp)) {
           errors.push(`Invalid CSS property: ${prop}`);
         }
-      });
-    }
-      
-    // Valida valores CSS básicos
-    if (response.styles) {
-      Object.entries(response.styles).forEach(([prop, value]) => {
+
         if (!this.isValidCSSValue(prop, value)) {
           errors.push(`Invalid value for ${prop}: ${value}`);
         }
       });
     }
-      
     return {
       isValid: errors.length === 0,
       errors: errors
