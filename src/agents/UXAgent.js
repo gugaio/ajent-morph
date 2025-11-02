@@ -153,7 +153,7 @@ class UXAgent extends Agent {
     - Não manipula regras @keyframes ou @media queries
     - Não gerencia variáveis CSS custom properties
     - Aplicação é imediata e não gradual (sem transições)`,
-      ({ description, styles, elementSelectors }) => this.applyStylesWrapper({ description, styles, elementSelectors })
+      ({ description, styles, elementSelectors }) => this.applyStylesToolImplementation({ description, styles, elementSelectors })
     ));
     
     this.addTool(new Tool(
@@ -273,8 +273,8 @@ class UXAgent extends Agent {
                 `;
   };
 
-  async applyStylesWrapper(params) {
-    console.log('applyStylesWrapper called with params:', params);
+  async applyStylesToolImplementation(params) {
+    console.log('applyStylesToolImplementation called with params:', params);
     
     // Dispatch tool start event for UI feedback
     const toolInfo = {
