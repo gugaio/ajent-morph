@@ -1,6 +1,6 @@
 class StyleValidator {
 
-  validateStyles(styles) { 
+  validate(styles) { 
         
     const parsedStyles = typeof styles === 'string' ? JSON.parse(styles) : styles;
     const validCSSProperties = new Set([

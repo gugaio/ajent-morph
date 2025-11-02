@@ -15,7 +15,7 @@ describe('StyleValidator', () => {
       margin: '10px',
     };
 
-    const result = styleValidator.validateStyles(styles);
+    const result = styleValidator.validate(styles);
 
     expect(result.isValid).toBe(true);
     expect(result.valid).toEqual(styles);
@@ -29,7 +29,7 @@ describe('StyleValidator', () => {
       color: 'blue',
     };
 
-    const result = styleValidator.validateStyles(styles);
+    const result = styleValidator.validate(styles);
 
     expect(result.isValid).toBe(false);
     expect(result.valid).toEqual({
@@ -46,7 +46,7 @@ describe('StyleValidator', () => {
       invalidProperty: 'value',
     });
 
-    const result = styleValidator.validateStyles(styles);
+    const result = styleValidator.validate(styles);
 
     expect(result.isValid).toBe(false);
     expect(result.valid).toEqual({
@@ -59,13 +59,13 @@ describe('StyleValidator', () => {
   test('deve retornar erro ao passar um JSON inválido como string', () => {
     const styles = '{invalidJson}';
 
-    expect(() => styleValidator.validateStyles(styles)).toThrow(SyntaxError);
+    expect(() => styleValidator.validate(styles)).toThrow(SyntaxError);
   });
 
   test('deve retornar válido para um objeto vazio', () => {
     const styles = {};
 
-    const result = styleValidator.validateStyles(styles);
+    const result = styleValidator.validate(styles);
 
     expect(result.isValid).toBe(true);
     expect(result.valid).toEqual({});
@@ -77,7 +77,7 @@ describe('StyleValidator', () => {
       unknownProperty: 'value',
     };
 
-    const result = styleValidator.validateStyles(styles);
+    const result = styleValidator.validate(styles);
 
     expect(result.isValid).toBe(false);
     expect(result.valid).toEqual({});

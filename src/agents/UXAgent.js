@@ -2,6 +2,7 @@ import { Agent, Tool } from 'ajent';
 import ResponseApplier from '../core/ResponseApplier.js';
 
 import StyleNormalizer from '../business/css/styleNormalizer.js';
+import StyleValidator from '../business/css/styleValidator.js';
 
 class UXAgent extends Agent {
   constructor() {
@@ -169,6 +170,9 @@ class UXAgent extends Agent {
       'Gera instruções específicas para implementar as mudanças visuais no código do projeto. IMPORTANTE: Esta tool retorna apenas as instruções de implementação. A LLM deve APENAS retornar as instruções geradas, sem executar comandos, propor patches ou realizar implementação adicional. Para diferentes frameworks: React (className, style props), Vue (class, style), CSS tradicional (seletores), Tailwind (classes utilitárias), CSS Modules (styles.className). Use após fazer modificações visuais.', 
       () => this.generateClaudeCodeInstructions()
     ));
+
+    this.styleNormalizer = new StyleNormalizer();
+    this.styleValidator = new StyleValidator();
   }
   instruction = () => {
     return `
@@ -734,11 +738,11 @@ class UXAgent extends Agent {
     }
     
     if (actualParams.styles) {
-      return this.validateStyles(actualParams);
+      return this.styleValidator.validate(actualParams);
     }
     
     if (typeof actualParams === 'object') {
-      return this.validateStyles({ styles: actualParams });
+      return this.styleValidator.validate({ styles: actualParams });
     }
     
     throw new Error('Invalid styles format');
@@ -748,10 +752,10 @@ class UXAgent extends Agent {
 
     const { description, styles, selectedElements = [] } = params;
 
-    const styleNormalizer = new StyleNormalizer();
-    const normalizedStyles = styleNormalizer.normalize(styles);
+    
+    const normalizedStyles = this.styleNormalizer.normalize(styles);
 
-    const validatedStyles = await this.validateStyles(normalizedStyles);
+    const validatedStyles = this.styleValidator.validate(normalizedStyles);
 
     if (!validatedStyles.isValid) {
       console.info('Some styles were filtered during validation:', validatedStyles.errors);
@@ -834,96 +838,6 @@ class UXAgent extends Agent {
     });
     
     return normalized;
-  }
-
-  normalizeColor(color) {
-    const colorMap = {
-      'azul': '#3B82F6',
-      'vermelho': '#EF4444', 
-      'verde': '#10B981',
-      'amarelo': '#F59E0B',
-      'roxo': '#8B5CF6',
-      'rosa': '#EC4899',
-      'cinza': '#6B7280',
-      'preto': '#000000',
-      'branco': '#FFFFFF',
-      'blue': '#3B82F6',
-      'red': '#EF4444',
-      'green': '#10B981',
-      'yellow': '#F59E0B',
-      'purple': '#8B5CF6',
-      'pink': '#EC4899',
-      'gray': '#6B7280',
-      'black': '#000000',
-      'white': '#FFFFFF',
-      'laranja': '#F97316',
-      'orange': '#F97316'
-    };
-
-    return colorMap[color.toLowerCase()] || color;
-  }
-
-  normalizeSize(size) {
-    if (typeof size === 'string') {
-      // If it's just a number, add px
-      if (/^\d+$/.test(size)) {
-        return size + 'px';
-      }
-      // If it already has units, keep as-is
-      return size;
-    }
-    if (typeof size === 'number') {
-      return size + 'px';
-    }
-    return size;
-  }
-
-  async validateStyles(styles) { 
-        
-    const parsedStyles = typeof styles === 'string' ? JSON.parse(styles) : styles;
-    const validCSSProperties = new Set([
-      'display', 'position', 'top', 'right', 'bottom', 'left',
-      'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
-      'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-      'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-      'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
-      'color', 'backgroundColor', 'border', 'borderTop', 'borderRight', 'borderBottom', 'borderLeft',
-      'borderColor', 'borderWidth', 'borderStyle', 'borderRadius',
-      'background', 'backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat', 'backgroundAttachment',
-      'boxShadow', 'textShadow', 'textAlign', 'textDecoration', 'textTransform',
-      'flexDirection', 'justifyContent', 'alignItems', 'alignSelf', 'flex', 'flexGrow', 'flexShrink',
-      'gridTemplateColumns', 'gridTemplateRows', 'gridGap', 'gap',
-      'transform', 'transition', 'animation', 'opacity', 'visibility', 'overflow',
-      'cursor', 'userSelect', 'pointerEvents', 'zIndex',
-      // WebKit specific properties for gradients and text effects
-      'WebkitBackgroundClip', 'webkitBackgroundClip', '-webkit-background-clip',
-      'WebkitTextFillColor', 'webkitTextFillColor', '-webkit-text-fill-color',
-      'WebkitTextStroke', 'webkitTextStroke', '-webkit-text-stroke',
-      'WebkitTextStrokeColor', 'webkitTextStrokeColor', '-webkit-text-stroke-color',
-      'WebkitTextStrokeWidth', 'webkitTextStrokeWidth', '-webkit-text-stroke-width',
-      // Additional background properties
-      'backgroundClip', 'background-clip',
-      // Mozilla specific
-      'MozBackgroundClip', 'mozBackgroundClip', '-moz-background-clip'
-    ]);
-
-    const errors = [];
-    const validStyles = {};
-
-    Object.entries(parsedStyles).forEach(([prop, value]) => {
-      if (validCSSProperties.has(prop)) {
-        validStyles[prop] = value;
-      } else {
-        errors.push(`Invalid CSS property: ${prop}`);
-      }
-    });
-
-    return {
-      valid: validStyles,
-      errors,
-      isValid: errors.length === 0
-    };
-
   }
 
 }
