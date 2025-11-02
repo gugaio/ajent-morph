@@ -13,9 +13,9 @@ describe('StyleNormalizer', () => {
     const normalized = normalizer.normalize(styles);
 
     expect(normalized).toEqual({
-      color: 'red',
-      backgroundColor: 'blue',
-      borderColor: 'green',
+      color: '#EF4444',
+      backgroundColor: '#3B82F6',
+      borderColor: '#10B981',
     });
   });
 
@@ -51,7 +51,7 @@ describe('StyleNormalizer', () => {
     const normalized = normalizer.normalize(styles);
 
     expect(normalized).toEqual({
-      color: 'red',
+      color: '#EF4444',
       width: '100px',
       display: 'block',
       margin: '10px',

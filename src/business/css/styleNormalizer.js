@@ -28,10 +28,32 @@ class StyleNormalizer {
   }
 
   // Helper method to normalize color values
-  normalizeColor(color) {
-    // Example: Convert named colors to lowercase
+  normalizeColor(color) {   
+    const colorMap = {
+      'azul': '#3B82F6',
+      'vermelho': '#EF4444', 
+      'verde': '#10B981',
+      'amarelo': '#F59E0B',
+      'roxo': '#8B5CF6',
+      'rosa': '#EC4899',
+      'cinza': '#6B7280',
+      'preto': '#000000',
+      'branco': '#FFFFFF',
+      'blue': '#3B82F6',
+      'red': '#EF4444',
+      'green': '#10B981',
+      'yellow': '#F59E0B',
+      'purple': '#8B5CF6',
+      'pink': '#EC4899',
+      'gray': '#6B7280',
+      'black': '#000000',
+      'white': '#FFFFFF',
+      'laranja': '#F97316',
+      'orange': '#F97316'
+    };
+
     if (typeof color === 'string') {
-      return color.toLowerCase();
+      return colorMap[color.toLowerCase()] || color;
     }
     return color;
   }
