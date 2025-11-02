@@ -4,6 +4,8 @@ import ResponseApplier from '../core/ResponseApplier.js';
 import StyleNormalizer from '../business/css/styleNormalizer.js';
 import StyleValidator from '../business/css/styleValidator.js';
 
+import WindowEventDispatcher from '../utils/windowEventDispatcher.js';
+
 class UXAgent extends Agent {
   constructor() {
     super('ux_agent', 'Especialista em implementação visual direta: transforma instruções em linguagem natural em modificações CSS precisas, geração inteligente de imagens e otimização de interfaces em tempo real. Atua como ponte entre concepção e implementação, garantindo fidelidade visual e eficiência técnica.');
@@ -173,6 +175,7 @@ class UXAgent extends Agent {
 
     this.styleNormalizer = new StyleNormalizer();
     this.styleValidator = new StyleValidator();
+
   }
   instruction = () => {
     return `
@@ -281,117 +284,91 @@ class UXAgent extends Agent {
 
   async applyStylesTool(params) {
     console.log('applyStylesTool called with params:', params);
+  
+    const TOOL_NAME = 'applyVisualStyles';
+    const DEFAULT_DESCRIPTION = 'Aplicando modificações de estilo';
     
-    // Dispatch tool start event for UI feedback
-    const toolInfo = {
-      tool: 'applyStyles',
-      description: params?.description || 'Aplicando modificações de estilo',
-      target: params?.elementSelectors?.join(', ') || 'elementos selecionados'
+    const sendError = (message) => {
+      WindowEventDispatcher.dispatch('ajentToolError', {
+        detail: { tool: 'ajentToolError', error: message }
+      });
+      return message;
     };
-    
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ajentToolStart', { detail: toolInfo }));
-    }
-    
-    // Handle case where Ajent framework wraps params in {params: 'stringified_json'}
+  
+    // Dispatch tool start event for UI feedback
+    const description = params?.description || DEFAULT_DESCRIPTION;
+    const target = params?.elementSelectors?.join(', ') || 'elementos selecionados';
+    WindowEventDispatcher.dispatch('ajentToolStart', { tool: 'applyStyles', description, target });
+  
+    // Handle Ajent framework JSON-wrapped params
     let actualParams = params;
-    if (params.params && typeof params.params === 'string') {
+    if (typeof params?.params === 'string') {
       try {
         actualParams = JSON.parse(params.params);
-        console.log('Parsed actualParams for applyVisualStyles:', actualParams);
+        console.log('Parsed actualParams:', actualParams);
       } catch (error) {
-        const errorMsg = '❌ ERRO: Falha ao interpretar parâmetros JSON - verifique a sintaxe';
-        console.warn('Failed to parse params.params:', error);
-        this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-        return errorMsg;
+        return sendError('❌ ERRO: Falha ao interpretar parâmetros JSON - verifique a sintaxe');
       }
     }
-    
-    // Validate required parameters
-    if (!actualParams.styles || typeof actualParams.styles !== 'object') {
-      const errorMsg = '❌ ERRO: Parâmetro "styles" é obrigatório e deve ser um objeto CSS válido';
-      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-      return errorMsg;
+  
+    const { styles, elementSelectors = [], description: desc = DEFAULT_DESCRIPTION } = actualParams;
+  
+    // Validate parameters
+    if (!styles || typeof styles !== 'object') {
+      return sendError('❌ ERRO: Parâmetro "styles" é obrigatório e deve ser um objeto CSS válido');
     }
-    
-    if (!actualParams.elementSelectors || !Array.isArray(actualParams.elementSelectors)) {
-      const errorMsg = '❌ ERRO: Parâmetro "elementSelectors" é obrigatório e deve ser um array de seletores CSS';
-      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-      return errorMsg;
+  
+    if (!Array.isArray(elementSelectors) || elementSelectors.length === 0) {
+      return sendError('❌ ERRO: Parâmetro "elementSelectors" é obrigatório e deve ser um array de seletores CSS');
     }
-    
-    let selectedElements = [];
-    
-    // Handle new elementSelectors format
-    if (actualParams.elementSelectors) {
-      console.log('elementSelectors received:', actualParams.elementSelectors);
-      selectedElements = this.reconstructElementsFromSelectors(actualParams.elementSelectors);
-      console.log('Reconstructed elements:', selectedElements);
-    }
-    // Handle case where selectors come from currentElementSelectors
-    else if (this.currentElementSelectors && this.currentElementSelectors.length > 0) {
-      console.log('Using currentElementSelectors:', this.currentElementSelectors);
+  
+    // Get selected elements
+    console.log('elementSelectors received:', elementSelectors);
+    let selectedElements = this.reconstructElementsFromSelectors(elementSelectors);
+  
+    if ((!selectedElements || selectedElements.length === 0) && this.currentElementSelectors?.length > 0) {
+      console.log('Using currentElementSelectors as fallback:', this.currentElementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(this.currentElementSelectors);
     }
-    
+  
     if (selectedElements.length === 0) {
-      const selectors = actualParams.elementSelectors.join(', ');
-      const errorMsg = `❌ ERRO: Nenhum elemento encontrado para os seletores: ${selectors}. Verifique se os seletores CSS estão corretos e os elementos existem na página.`;
-      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-      return errorMsg;
+      return sendError(`❌ ERRO: Nenhum elemento encontrado para os seletores: ${elementSelectors.join(', ')}`);
     }
-    
-    // Call the main applyVisualStyles method
+  
+    // Apply styles
     try {
-      const result = await this.applyVisualStyles({
-        description: actualParams.description,
-        styles: actualParams.styles,
-        selectedElements: selectedElements
-      });
-      
-      // Create detailed success message
-      const appliedStyles = Object.entries(actualParams.styles)
+      const result = await this.applyVisualStyles({ description: desc, styles, selectedElements });
+  
+      const appliedStyles = Object.entries(styles)
         .map(([prop, value]) => `${prop}: ${value}`)
         .join(', ');
-      
-      const successMsg = `SUCESSO: Estilos aplicados com sucesso!
-📍 Elementos afetados: ${selectedElements.length} elemento(s) [${actualParams.elementSelectors.join(', ')}]
-🎨 Estilos aplicados: ${appliedStyles}
-📝 Descrição: ${actualParams.description || 'Modificação de estilo'}`;
-      
-      // Dispatch success event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('ajentToolSuccess', {
-          detail: {
-            tool: 'applyVisualStyles',
-            result: successMsg,
-            elementsCount: selectedElements.length,
-            styles: actualParams.styles
-          }
-        }));
-      }
-      
+  
+      const successMsg = [
+        '✅ SUCESSO: Estilos aplicados com sucesso!',
+        `📍 Elementos afetados: ${selectedElements.length} [${elementSelectors.join(', ')}]`,
+        `🎨 Estilos aplicados: ${appliedStyles}`,
+        `📝 Descrição: ${desc}`,
+      ].join('\n');
+  
+      WindowEventDispatcher.dispatch('ajentToolSuccess', {
+        tool: TOOL_NAME,
+        result: successMsg,
+        elementsCount: selectedElements.length,
+        styles,
+      });
+  
       return successMsg;
-      
+  
     } catch (error) {
-      const errorMsg = `❌ ERRO na aplicação de estilos: ${error.message}
-🔍 Elementos alvo: ${actualParams.elementSelectors.join(', ')}
-🎨 Estilos tentados: ${JSON.stringify(actualParams.styles, null, 2)}`;
-      
-      // Dispatch error event
-      this.dispatchErrorEvent('applyVisualStyles', errorMsg);
-      return errorMsg;
+      return sendError(
+        `❌ ERRO na aplicação de estilos: ${error.message}\n` +
+        `🔍 Elementos alvo: ${elementSelectors.join(', ')}\n` +
+        `🎨 Estilos tentados: ${JSON.stringify(styles, null, 2)}`
+      );
     }
   }
+  
 
-  // Helper method for error events
-  dispatchErrorEvent(tool, errorMsg) {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ajentToolError', {
-        detail: { tool, error: errorMsg }
-      }));
-    }
-  }
 
   async generateClaudeCodeInstructions(params) {
     console.log('generateClaudeCodeInstructions called with params:', params);
