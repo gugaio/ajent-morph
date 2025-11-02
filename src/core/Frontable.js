@@ -330,7 +330,6 @@ class Frontable {
     try {
       // Get selected elements
       let selectedElements = this.elementSelector.getMultiSelectedElements();
-      
       // If no elements are currently selected, try to restore last selection
       if (selectedElements.length === 0 && this.elementSelector.hasLastSelection()) {
         console.log('🔄 No current selection, attempting to restore last selection...');
@@ -354,7 +353,7 @@ class Frontable {
 
       // Process the command with the LLM agent to determine action and execute it
       result = await this.commandProcessor.process(message, {
-        selectedElements: selectedElements,
+        elements: selectedElements,
         mode: 'intelligent_decision',
         visualContext: visualContext
       });

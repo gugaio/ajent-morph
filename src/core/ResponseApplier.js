@@ -56,24 +56,17 @@ class ResponseApplier {
   }
     
 
-  async applyLLMResponse(llmResponse, element, originalCommand) {
-    try {
-      // Parse da resposta (pode vir como string ou objeto)
-      const response = this.parseLLMResponse(llmResponse);
-        
-      // Valida a resposta
+  async applyLLMResponse(response, element, originalCommand) {
+    try {        
       const validation = this.validateResponse(response);
       if (!validation.isValid) {
         throw new Error(`Invalid LLM response: ${validation.errors.join(', ')}`);
       }
         
-      // Salva estado atual para undo
       const previousState = this.captureElementState(element);
         
-      // Aplica as mudanças
       const appliedChanges = await this.applyStyles(element, response.styles);
         
-      // Registra no histórico
       this.addToHistory({
         timestamp: Date.now(),
         element: this.getElementSelector(element),
@@ -83,7 +76,6 @@ class ResponseApplier {
         appliedChanges: appliedChanges
       });
         
-      // Retorna resultado
       return {
         success: true,
         message: response.explanation || response.message || 'Mudanças aplicadas com sucesso!',
@@ -107,6 +99,7 @@ class ResponseApplier {
      */
   parseLLMResponse(response) {
     // Se já é objeto, retorna direto
+    debugger
     if (typeof response === 'object' && response !== null) {
       return response;
     }
@@ -172,13 +165,8 @@ class ResponseApplier {
   validateResponse(response) {
     const errors = [];
       
-    // Verifica estrutura básica
-    if (!response || typeof response !== 'object') {
-      errors.push('Response must be an object');
-    }
-      
     // Verifica se tem styles
-    if (!response.styles || typeof response.styles !== 'object') {
+    if (typeof response.styles !== 'object') {
       errors.push('Response must have a styles object');
     }
       
