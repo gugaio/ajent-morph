@@ -55,9 +55,7 @@ class ResponseApplier {
     ]);
   }
     
-  /**
-     * Aplica resposta da LLM ao elemento
-     */
+
   async applyLLMResponse(llmResponse, element, originalCommand) {
     try {
       // Parse da resposta (pode vir como string ou objeto)

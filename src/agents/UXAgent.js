@@ -746,10 +746,8 @@ class UXAgent extends Agent {
 
     const { description, styles, selectedElements = [] } = params;
 
-    // Validate and normalize the provided styles
     const normalizedStyles = this.normalizeStyles(styles);
 
-    // Validate CSS properties
     const validation = await this.validateStyles(normalizedStyles);
 
     if (!validation.isValid) {

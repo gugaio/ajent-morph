@@ -37,12 +37,8 @@ class CommandProcessor {
   }
   
   async process(message, context = {}) {
-    const { selectedElements, visualContext } = context; 
-    return await this.processIntelligentDecision(message, selectedElements, visualContext);
-  }
-
-  async processIntelligentDecision(message, elements, visualContext = null) {
-    // Special case: Claude Code instructions don't require selected elements
+    const { elements, visualContext } = context; 
+    
     const isIDEPromptRequest = message.toLowerCase().includes('#ide');
     
     // Check if there are elements selected first, before calling LLM (except for Claude Code instructions)
@@ -111,6 +107,12 @@ class CommandProcessor {
       const firstElement = elements && elements.length > 0 ? elements[0] : null;
       return await this.createLocalFallbackResponse(message, firstElement);
     }
+    
+  }
+
+  async processIntelligentDecision(message, elements, visualContext = null) {
+    // Special case: Claude Code instructions don't require selected elements
+    
   }
 
   generateContextPrompt(message, isClaudeCodeRequest, elements, elementSelectors, visualContext) {
