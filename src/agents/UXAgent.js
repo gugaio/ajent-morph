@@ -1,6 +1,8 @@
 import { Agent, Tool } from 'ajent';
 import ResponseApplier from '../core/ResponseApplier.js';
 
+import StyleNormalizer from '../business/css/styleNormalizer.js';
+
 class UXAgent extends Agent {
   constructor() {
     super('ux_agent', 'Especialista em implementação visual direta: transforma instruções em linguagem natural em modificações CSS precisas, geração inteligente de imagens e otimização de interfaces em tempo real. Atua como ponte entre concepção e implementação, garantindo fidelidade visual e eficiência técnica.');
@@ -153,7 +155,7 @@ class UXAgent extends Agent {
     - Não manipula regras @keyframes ou @media queries
     - Não gerencia variáveis CSS custom properties
     - Aplicação é imediata e não gradual (sem transições)`,
-      ({ description, styles, elementSelectors }) => this.applyStylesToolImplementation({ description, styles, elementSelectors })
+      ({ description, styles, elementSelectors }) => this.applyStylesTool({ description, styles, elementSelectors })
     ));
     
     this.addTool(new Tool(
@@ -273,8 +275,8 @@ class UXAgent extends Agent {
                 `;
   };
 
-  async applyStylesToolImplementation(params) {
-    console.log('applyStylesToolImplementation called with params:', params);
+  async applyStylesTool(params) {
+    console.log('applyStylesTool called with params:', params);
     
     // Dispatch tool start event for UI feedback
     const toolInfo = {
@@ -746,12 +748,13 @@ class UXAgent extends Agent {
 
     const { description, styles, selectedElements = [] } = params;
 
-    const normalizedStyles = this.normalizeStyles(styles);
+    const styleNormalizer = new StyleNormalizer();
+    const normalizedStyles = styleNormalizer.normalize(styles);
 
-    const validation = await this.validateStyles(normalizedStyles);
+    const validatedStyles = await this.validateStyles(normalizedStyles);
 
-    if (!validation.isValid) {
-      console.info('Some styles were filtered during validation:', validation.errors);
+    if (!validatedStyles.isValid) {
+      console.info('Some styles were filtered during validation:', validatedStyles.errors);
       // Continue with valid styles only - this is expected behavior
     }
 
@@ -779,7 +782,7 @@ class UXAgent extends Agent {
         const result = await this.applier.applyLLMResponse(
           {
             action: description,
-            styles: validation.valid,
+            styles: validatedStyles.valid,
             explanation: description
           },
           element,
