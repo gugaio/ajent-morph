@@ -282,47 +282,21 @@ class UXAgent extends Agent {
                 `;
   };
 
-  async applyStylesTool(params) {
-    console.log('applyStylesTool called with params:', params);
-  
-    const TOOL_NAME = 'applyVisualStyles';
-    const DEFAULT_DESCRIPTION = 'Aplicando modificações de estilo';
-    
-    const sendError = (message) => {
-      WindowEventDispatcher.dispatch('ajentToolError', {
-        detail: { tool: 'ajentToolError', error: message }
-      });
-      return message;
-    };
-  
-    // Dispatch tool start event for UI feedback
-    const description = params?.description || DEFAULT_DESCRIPTION;
-    const target = params?.elementSelectors?.join(', ') || 'elementos selecionados';
-    WindowEventDispatcher.dispatch('ajentToolStart', { tool: 'applyStyles', description, target });
-  
-    // Handle Ajent framework JSON-wrapped params
-    let actualParams = params;
+  parseParams = (params) => {
     if (typeof params?.params === 'string') {
       try {
-        actualParams = JSON.parse(params.params);
-        console.log('Parsed actualParams:', actualParams);
+        return JSON.parse(params.params);
       } catch (error) {
-        return sendError('❌ ERRO: Falha ao interpretar parâmetros JSON - verifique a sintaxe');
+        return null;
       }
     }
-  
-    const { styles, elementSelectors = [], description: desc = DEFAULT_DESCRIPTION } = actualParams;
-  
-    // Validate parameters
-    if (!styles || typeof styles !== 'object') {
-      return sendError('❌ ERRO: Parâmetro "styles" é obrigatório e deve ser um objeto CSS válido');
-    }
-  
+    return params;
+  };
+
+  elementsFromSelectors(elementSelectors){
     if (!Array.isArray(elementSelectors) || elementSelectors.length === 0) {
-      return sendError('❌ ERRO: Parâmetro "elementSelectors" é obrigatório e deve ser um array de seletores CSS');
-    }
-  
-    // Get selected elements
+      return null;
+    }  
     console.log('elementSelectors received:', elementSelectors);
     let selectedElements = this.reconstructElementsFromSelectors(elementSelectors);
   
@@ -330,6 +304,32 @@ class UXAgent extends Agent {
       console.log('Using currentElementSelectors as fallback:', this.currentElementSelectors);
       selectedElements = this.reconstructElementsFromSelectors(this.currentElementSelectors);
     }
+    return selectedElements;
+  }
+
+  async applyStylesTool(params) {  
+    const TOOL_NAME = 'applyVisualStyles';
+    
+    const sendError = (message) => {
+      WindowEventDispatcher.dispatch('ajentToolError', {
+        detail: { tool: 'ajentToolError', error: message }
+      });
+      return message;
+    };
+
+    let parsedParams = this.parseParams(params);
+    if (!parsedParams) {
+      return sendError('❌ ERRO: Parâmetros inválidos. Não foi possível analisar os parâmetros fornecidos.');
+    }    
+
+    const { styles, elementSelectors = [], description } = parsedParams;
+  
+    // Validate parameters
+    if (!styles || typeof styles !== 'object') {
+      return sendError('❌ ERRO: Parâmetro "styles" é obrigatório e deve ser um objeto CSS válido');
+    }
+  
+    let selectedElements = this.elementsFromSelectors(elementSelectors);
   
     if (selectedElements.length === 0) {
       return sendError(`❌ ERRO: Nenhum elemento encontrado para os seletores: ${elementSelectors.join(', ')}`);
@@ -337,7 +337,7 @@ class UXAgent extends Agent {
   
     // Apply styles
     try {
-      const result = await this.applyVisualStyles({ description: desc, styles, selectedElements });
+      await this.applyVisualStyles({ description, styles, selectedElements });
   
       const appliedStyles = Object.entries(styles)
         .map(([prop, value]) => `${prop}: ${value}`)
@@ -347,7 +347,7 @@ class UXAgent extends Agent {
         '✅ SUCESSO: Estilos aplicados com sucesso!',
         `📍 Elementos afetados: ${selectedElements.length} [${elementSelectors.join(', ')}]`,
         `🎨 Estilos aplicados: ${appliedStyles}`,
-        `📝 Descrição: ${desc}`,
+        `📝 Descrição: ${description}`,
       ].join('\n');
   
       WindowEventDispatcher.dispatch('ajentToolSuccess', {
