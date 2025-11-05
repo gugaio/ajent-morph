@@ -1,5 +1,5 @@
 import { Agent, Tool } from 'ajent';
-import ResponseApplier from '../core/ResponseApplier.js';
+import StyleApplier from '../core/StyleApplier.js';
 
 import StyleNormalizer from '../business/css/styleNormalizer.js';
 import StyleValidator from '../business/css/styleValidator.js';
@@ -11,7 +11,7 @@ class UXAgent extends Agent {
     super('ux_agent', 'Especialista em implementação visual direta: transforma instruções em linguagem natural em modificações CSS precisas, geração inteligente de imagens e otimização de interfaces em tempo real. Atua como ponte entre concepção e implementação, garantindo fidelidade visual e eficiência técnica.');
     
     // Initialize ResponseApplier for applying styles and maintaining history
-    this.applier = new ResponseApplier();
+    this.applier = new StyleApplier();
 
     this.addTool(new Tool(
       'applyVisualStyles', 
@@ -337,7 +337,7 @@ class UXAgent extends Agent {
   
     // Apply styles
     try {
-      await this.applyVisualStyles({ description, styles, selectedElements });
+      await this.applyStyles({ description, styles, selectedElements });
   
       const appliedStyles = Object.entries(styles)
         .map(([prop, value]) => `${prop}: ${value}`)
@@ -533,7 +533,7 @@ class UXAgent extends Agent {
         for (const element of elements) {
           try {
             // Apply background image
-            await this.applier.applyLLMResponse({
+            await this.applier.apply({
               action: 'apply_background_image',
               explanation: `Imagem de fundo aplicada: ${description}`,
               styles: {
@@ -568,7 +568,7 @@ class UXAgent extends Agent {
         this.addNewElementIndicator(imgElement);
         
         // Track in history
-        await this.applier.applyLLMResponse({
+        await this.applier.apply({
           action: 'create_image_element',
           explanation: `Elemento de imagem criado: ${description}`,
           styles: {},
@@ -725,10 +725,9 @@ class UXAgent extends Agent {
     throw new Error('Invalid styles format');
   }
   
-  async applyVisualStyles(params) {
+  async applyStyles(params) {
 
     const { description, styles, selectedElements = [] } = params;
-
     
     const normalizedStyles = this.styleNormalizer.normalize(styles);
 
@@ -760,7 +759,7 @@ class UXAgent extends Agent {
 
       try {
         // Use ResponseApplier to apply styles and maintain history
-        const result = await this.applier.applyLLMResponse(
+        const result = await this.applier.apply(
           {
             action: description,
             styles: validatedStyles.valid,

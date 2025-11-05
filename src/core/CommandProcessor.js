@@ -1,5 +1,5 @@
 import ElementInspector from './ElementInspector';
-import ResponseApplier from './ResponseApplier';
+import ResponseApplier from './StyleApplier.js';
 import { Squad } from 'ajent';
 import UXAgent from '../agents/UXAgent.js';
 

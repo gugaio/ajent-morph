@@ -1,4 +1,4 @@
-class ResponseApplier {
+class StyleApplier {
   constructor() {
     this.changeHistory = [];
     this.maxHistorySize = 50;
@@ -56,9 +56,9 @@ class ResponseApplier {
   }
     
 
-  async applyLLMResponse(response, element, originalCommand) {
+  async apply(response, element, originalCommand) {
     try {        
-      const validation = this.validateResponse(response);
+      const validation = this.validateStyles(response.styles);
       if (!validation.isValid) {
         throw new Error(`Invalid LLM response: ${validation.errors.join(', ')}`);
       }
@@ -77,18 +77,13 @@ class ResponseApplier {
       });
         
       return {
-        success: true,
-        message: response.explanation || response.message || 'Mudanças aplicadas com sucesso!',
-        action: response.action,
-        appliedStyles: appliedChanges,
-        canUndo: true
+        success: true
       };
         
     } catch (error) {
       console.error('Error applying LLM response:', error);
       return {
         success: false,
-        message: `Erro ao aplicar mudanças: ${error.message}`,
         error: error
       };
     }
@@ -99,7 +94,6 @@ class ResponseApplier {
      */
   parseLLMResponse(response) {
     // Se já é objeto, retorna direto
-    debugger
     if (typeof response === 'object' && response !== null) {
       return response;
     }
@@ -162,17 +156,17 @@ class ResponseApplier {
   /**
      * Valida resposta da LLM
      */
-  validateResponse(response) {
+  validateStyles(styles) {
     const errors = [];
       
     // Verifica se tem styles
-    if (typeof response.styles !== 'object') {
+    if (typeof styles !== 'object') {
       errors.push('Response must have a styles object');
     }
       
     // Valida propriedades CSS
-    if (response.styles) {
-      Object.entries(response.styles).forEach(([prop, value]) => {
+    if (styles) {
+      Object.entries(styles).forEach(([prop, value]) => {
         const kebabProp = this.camelToKebab(prop);
         const camelProp = this.kebabToCamel(prop);
           
@@ -193,9 +187,7 @@ class ResponseApplier {
     };
   }
     
-  /**
-     * Aplica estilos ao elemento
-     */
+  
   async applyStyles(element, styles) {
     // Validate that element is a proper DOM element
     if (!element || !element.nodeType || element.nodeType !== Node.ELEMENT_NODE) {
@@ -643,4 +635,4 @@ class ResponseApplier {
   }
 }
 
-export default ResponseApplier;
+export default StyleApplier;
